@@ -1,0 +1,40 @@
+{
+	"dependencies": {},
+	"description": "Typesafe drizzle-orm inspired abstraction over IndexedDB",
+	"devDependencies": {
+		"@biomejs/biome": "^2.4.13",
+		"bumpp": "^11.0.1",
+		"bunup": "^0.16.31",
+		"typescript": "^6.0.3"
+	},
+	"files": [
+		"dist"
+	],
+	"homepage": "https://github.com/iceman8911/drizzlidb#readme",
+	"license": "MIT",
+	"main": "./dist/index.cjs",
+	"module": "./dist/index.js",
+	"name": "drizzlidb",
+	"repository": {
+		"type": "git",
+		"url": "git+https://github.com/iceman8911/drizzlidb.git"
+	},
+	"scripts": {
+		"build": "bunup",
+		"check-types": "tsc --noEmit",
+		"dev": "bunup --watch",
+		"format": "biome format .",
+		"format:fix": "biome format --write .",
+		"lint": "biome check .",
+		"lint:fix": "biome check --write .",
+		"publish:ci": "bun publish --access public --no-git-checks",
+		"release": "bumpp --commit --push --tag",
+		"test": "bun test",
+		"test:coverage": "bun test --coverage",
+		"test:watch": "bun test --watch",
+		"tsc": "tsc --noEmit"
+	},
+	"type": "module",
+	"types": "./dist/index.d.ts",
+	"version": "0.1.0"
+}
