@@ -5,6 +5,7 @@
 		"@biomejs/biome": "^2.4.13",
 		"bumpp": "^11.0.1",
 		"bunup": "^0.16.31",
+		"type-fest": "^5.6.0",
 		"typescript": "^6.0.3"
 	},
 	"files": [
