@@ -1,0 +1,491 @@
+/** biome-ignore-all lint/suspicious/noExplicitAny: <To accept any builder type> */
+import type { Merge, Promisable } from "type-fest";
+import type { IndexedDbCompatibleType, Satisfies } from "../../shared/types";
+import { clone, getRandomUuid, isNotUndefined } from "../../shared/util";
+
+export interface BaseColumnGenerics {
+	/** The actual type provided from consumer code for storing, updating, etc */
+	type: unknown;
+	/** What is stored in indexedDB */
+	dbType: IndexedDbCompatibleType;
+	isNullable: boolean;
+	hasDefaultVal: boolean;
+	hasUpdateVal: boolean;
+	// enumType: string | undefined
+	isUniqueIndex: boolean;
+	isIndex: boolean;
+	indexName: string;
+	isMultiEntryIndex: boolean;
+	isPrimaryKey: boolean;
+	isComputed: boolean;
+	isReadonly: boolean;
+}
+
+type AnyColumnBuilder = BaseColumnBuilder<
+	string,
+	Record<keyof BaseColumnGenerics, any>
+>;
+
+export type DefaultBaseColumnGenerics = Satisfies<
+	{
+		isNullable: false;
+		type: unknown;
+		dbType: IndexedDbCompatibleType;
+		hasDefaultVal: false;
+		hasUpdateVal: false;
+		isUniqueIndex: false;
+		isIndex: false;
+		indexName: string;
+		isMultiEntryIndex: false;
+		isPrimaryKey: false;
+		isComputed: false;
+		isReadonly: false;
+	},
+	BaseColumnGenerics
+>;
+
+type CanHaveDefaultVal<TGenerics extends BaseColumnGenerics> =
+	true extends TGenerics["isComputed"] ? false : true;
+
+type CanHaveUpdateVal<TGenerics extends BaseColumnGenerics> =
+	true extends TGenerics["isComputed"]
+		? false
+		: true extends TGenerics["isReadonly"]
+			? false
+			: true;
+
+type CanHaveRegularIndex<TGenerics extends BaseColumnGenerics> =
+	true extends TGenerics["isIndex"] ? false : true;
+
+type CanBeNullable<TGenerics extends BaseColumnGenerics> =
+	true extends TGenerics["hasDefaultVal"]
+		? false
+		: true extends TGenerics["hasUpdateVal"]
+			? false
+			: true extends TGenerics["isComputed"]
+				? false
+				: true extends TGenerics["isReadonly"]
+					? false
+					: true extends TGenerics["isPrimaryKey"]
+						? false
+						: true;
+
+// ----------------------------------
+// Column capability predicates
+// These conditional types express what operations a column
+// may accept based on its generic state (computed, readonly, etc).
+// ----------------------------------
+
+export type BaseColumnBuilderConfig<
+	TGenerics extends BaseColumnGenerics = DefaultBaseColumnGenerics,
+> = Readonly<{
+	/** If present, the column is mean to be an index */
+	indexName?: string;
+
+	defaultVal?: TGenerics["type"] | (() => Promisable<TGenerics["type"]>);
+	updater?: TGenerics["type"] | (() => Promisable<TGenerics["type"]>);
+	validator?: (val: TGenerics["type"]) => Promisable<boolean | string>;
+	transformer?: {
+		fromDb: (val: TGenerics["dbType"]) => Promisable<TGenerics["type"]>;
+		toDb: (val: TGenerics["type"]) => Promisable<TGenerics["dbType"]>;
+	};
+	computation?: () => Promisable<TGenerics["type"]>;
+
+	isNullable?: boolean;
+	isMultiEntryIndex?: boolean;
+	isUniqueIndex?: boolean;
+	isPrimaryKey?: boolean;
+	isReadonly?: boolean;
+}>;
+
+export const DEFAULT_COLUMN_BUILDER_CONFIG =
+	{} as const satisfies BaseColumnBuilderConfig;
+
+export type GetColumnBuilderState<TBuilder extends AnyColumnBuilder> =
+	TBuilder extends {
+		readonly _state: infer RGenerics;
+	}
+		? RGenerics
+		: never;
+
+/** Workaround for self-referencing generic? */
+export type WithColumnBuilderState<
+	TBuilder extends AnyColumnBuilder,
+	TUpdates extends Partial<BaseColumnGenerics>,
+> = Merge<
+	TBuilder,
+	{
+		readonly _state: {
+			[K in keyof GetColumnBuilderState<TBuilder>]: K extends keyof TUpdates
+				? NonNullable<TUpdates[K]>
+				: GetColumnBuilderState<TBuilder>[K];
+		};
+	}
+>;
+
+// ----------------------------------
+// Builder state transformation helpers
+// These helpers return new builder types with updated `_state` fields
+// reflecting changes like `.default()`, `.primary()`, `.readonly()`, etc.
+// ----------------------------------
+
+type WithBrand<
+	TBuilder extends AnyColumnBuilder,
+	TBrand extends string,
+> = WithColumnBuilderState<
+	TBuilder,
+	{ type: { __brand: TBrand } & GetColumnBuilderState<TBuilder>["type"] }
+>;
+
+type WithComputed<TBuilder extends AnyColumnBuilder> = WithColumnBuilderState<
+	TBuilder,
+	{
+		isComputed: true;
+		isReadonly: true;
+		isNullable: false;
+		hasDefaultVal: false;
+		hasUpdateVal: false;
+	}
+>;
+
+type WithDefault<TBuilder extends AnyColumnBuilder> = WithColumnBuilderState<
+	TBuilder,
+	{ hasDefaultVal: true; isNullable: false }
+>;
+
+type WithIndex<
+	TBuilder extends AnyColumnBuilder,
+	TIdxName extends string = string,
+> = WithColumnBuilderState<TBuilder, { indexName: TIdxName; isIndex: true }>;
+
+type WithNullable<TBuilder extends AnyColumnBuilder> = WithColumnBuilderState<
+	TBuilder,
+	{ isNullable: true }
+>;
+
+type WithPrimary<
+	TBuilder extends AnyColumnBuilder,
+	TIdxName extends string = string,
+> = WithColumnBuilderState<
+	TBuilder,
+	{
+		isUniqueIndex: true;
+		indexName: TIdxName;
+		isPrimaryKey: true;
+		isNullable: false;
+		isIndex: true;
+	}
+>;
+
+type WithReadonly<TBuilder extends AnyColumnBuilder> = WithColumnBuilderState<
+	TBuilder,
+	{ isReadonly: true; isNullable: false; hasUpdateVal: false }
+>;
+
+type WithTransform<
+	TBuilder extends AnyColumnBuilder,
+	TDbType extends IndexedDbCompatibleType,
+> = WithColumnBuilderState<TBuilder, { dbType: TDbType }>;
+
+type WithUpdate<TBuilder extends AnyColumnBuilder> = WithColumnBuilderState<
+	TBuilder,
+	{ hasUpdateVal: true; isNullable: false }
+>;
+
+type WithUnique<
+	TBuilder extends AnyColumnBuilder,
+	TIdxName extends string = string,
+> = WithColumnBuilderState<
+	TBuilder,
+	{ isUniqueIndex: true; indexName: TIdxName; isIndex: true }
+>;
+
+// TODO: add a type-level error for custom column builders with data types not directly supported by structclone and wothout a propert transform
+/** Do not add private or protected properties to this or it's sub classes since it messes up with inference.
+ *
+ * @internal
+ *
+ */
+export abstract class BaseColumnBuilder<
+	const TName extends string = string,
+	const TGenerics extends BaseColumnGenerics = DefaultBaseColumnGenerics,
+> {
+	/** @internal */
+	readonly _ctor = this.constructor as {
+		new <
+			const TName extends string,
+			const TGenerics extends BaseColumnGenerics = DefaultBaseColumnGenerics,
+		>(
+			name?: TName,
+			config?: BaseColumnBuilderConfig<TGenerics>,
+		): any;
+	};
+
+	/** Keep this as a one-level flat object.
+	 *
+	 * @internal
+	 */
+	readonly _config: BaseColumnBuilderConfig<typeof this._state>;
+
+	/** Error messages.
+	 *
+	 * @internal
+	 */
+	readonly _err = {
+		default: "🚨 Cannot set a default value on a computed column.",
+		index: (oldIdxName: (typeof this._state)["indexName"]) =>
+			`🚨 An index named '${oldIdxName}' already exists. Try removing any \`.primary()\` or \`.unique()\` ` as const,
+		nullable:
+			"🚨 Cannot enforce a nullable column when a computation, default value, updater, readonly constraint, primary constraint is present.",
+		updater: "🚨 Cannot add an updater to a readonly or computed column.",
+	} as const;
+
+	/** Type-level only generic state. Use this over `TGenerics`.
+	 *
+	 * @internal
+	 */
+	declare readonly _state: TGenerics;
+
+	readonly name: TName;
+
+	constructor(
+		name: TName = getRandomUuid() as TName,
+		config: BaseColumnBuilderConfig<typeof this._state> = clone(
+			DEFAULT_COLUMN_BUILDER_CONFIG,
+		),
+	) {
+		this.name = name;
+		this._config = config;
+	}
+
+	/**
+	 * @internal
+	 */
+	_factory<
+		TSelf extends AnyColumnBuilder,
+		TUpdates extends Partial<BaseColumnGenerics>,
+		TConfig extends Partial<BaseColumnBuilderConfig<any>> = Partial<
+			BaseColumnBuilderConfig<TSelf["_state"]>
+		>,
+	>(this: TSelf, updates: TConfig): WithColumnBuilderState<TSelf, TUpdates> {
+		return new this._ctor(this.name, {
+			...this._config,
+			...updates,
+		});
+	}
+
+	/** Brand the columns type for better uniqueness.
+	 *
+	 * Runtime-only.
+	 */
+	brand<const TBrand extends string, TSelf extends AnyColumnBuilder>(
+		this: TSelf,
+		_brand: TBrand,
+	): WithBrand<TSelf, TBrand> {
+		return this as never;
+	}
+
+	/** Creates a "fake" column computed from columns of the given table.
+	 *
+	 * The column will be removed from it's `insert` and `update` types entirely, and cannot be nullable.
+	 *
+	 * Implictly makes the column readonly.
+	 *
+	 * NOTE: Overrides `.nullable()`, `.default()`, `.update()`, `.readonly()`.
+	 *
+	 * @param ref reference to the table to compute from, e.g () => UserTable
+	 */
+	computed<TSelf extends AnyColumnBuilder, TTable>(
+		this: TSelf,
+		ref: () => TTable,
+		compute: (table: TTable) => Promisable<TSelf["_state"]["type"]>,
+	): WithComputed<TSelf> {
+		return this._factory({
+			computation() {
+				return compute(ref());
+			},
+			defaultVal: undefined,
+			isNullable: true,
+			isReadonly: true,
+			updater: undefined,
+		}) as never;
+	}
+
+	/** Set a default value or a callback that produces a value for the cell for `insert`s that don't provide a value.
+	 *
+	 * Differs from `.update()` in the sense that it is only applied on `insert`s to the relevant column, assuming a value wasn't explictly provided by the input.
+	 *
+	 * The column will be optional in it's `insert` type.
+	 *
+	 * NOTE: Overrides `.nullable()`. Is overidden by `.computed()`.
+	 */
+	default<TSelf extends AnyColumnBuilder>(
+		this: TSelf,
+		valOrFn: NonNullable<
+			BaseColumnBuilderConfig<TSelf["_state"]>["defaultVal"]
+		>,
+	): true extends CanHaveDefaultVal<TSelf["_state"]>
+		? WithDefault<TSelf>
+		: typeof this._err.default {
+		if (isNotUndefined(this._config.computation))
+			throw Error(this._err.default);
+
+		return this._factory({
+			defaultVal: valOrFn,
+			isNullable: false,
+		}) as never;
+	}
+
+	/** Creates an index for this column for fast querying.
+	 *
+	 * NOTE: Is overridden by `.unique()`, `.primary()`.
+	 *
+	 * @param name index name
+	 */
+	index<
+		TSelf extends AnyColumnBuilder,
+		const TIdxName extends string = `${TName}_idx`,
+	>(
+		this: TSelf,
+		name?: TIdxName,
+	): true extends CanHaveRegularIndex<TSelf["_state"]>
+		? WithIndex<TSelf>
+		: ReturnType<TSelf["_err"]["index"]> {
+		const oldIdxName = this._config.indexName;
+
+		if (isNotUndefined(oldIdxName)) throw Error(this._err.index(oldIdxName));
+
+		return this._factory({
+			indexName: name ?? `${this.name}_idx`,
+		}) as never;
+	}
+
+	/** Explicitly denotes that the column is nullable.
+	 *
+	 * The column will be optional in it's `insert` type.
+	 *
+	 * NOTE: Is overridden by `.default()`, `.update()`, `.computed()`, `.readonly()`, `.primary()`.
+	 */
+	nullable<TSelf extends AnyColumnBuilder>(
+		this: TSelf,
+	): true extends CanBeNullable<TSelf["_state"]>
+		? WithNullable<TSelf>
+		: TSelf["_err"]["nullable"] {
+		const { computation, defaultVal, updater, isReadonly, isPrimaryKey } =
+			this._config;
+
+		if (
+			isNotUndefined(computation) ||
+			isNotUndefined(defaultVal) ||
+			isNotUndefined(updater) ||
+			isReadonly ||
+			isPrimaryKey
+		)
+			throw Error(this._err.nullable);
+
+		return this._factory({ isNullable: true }) as never;
+	}
+
+	/** Denotes that this column should be the primary key of a table.
+	 *
+	 * Implictly creates a unique index for this column.
+	 *
+	 * NOTE: Overrides `.index()`, `.nullable()`.
+	 *
+	 * @param name primary key index name
+	 */
+	primary<
+		TSelf extends AnyColumnBuilder,
+		const TIdxName extends string = `${TName}_primary_idx`,
+	>(this: TSelf, name?: TIdxName): WithPrimary<TSelf, TIdxName> {
+		return this._factory({
+			indexName: name ?? `${this.name}_primary_idx`,
+			isNullable: false,
+			isPrimaryKey: true,
+			isUniqueIndex: true,
+		}) as never;
+	}
+
+	/** Prevents modifications to this column after `insert`s.
+	 *
+	 * The column will be removed entirely from its `insert` and `update` types.
+	 *
+	 * NOTE: Overrides `.nullable()`, `.update()`.
+	 */
+	readonly<TSelf extends AnyColumnBuilder>(this: TSelf): WithReadonly<TSelf> {
+		return this._factory({
+			isNullable: false,
+			isReadonly: true,
+			updater: undefined,
+		}) as never;
+	}
+
+	/** Converts data into types compatible with IndexedDB.
+	 *
+	 * Valuable for custom classes and the like.
+	 *
+	 * TODO: move this over to the `CustomColumnBuilder` since that will accept arbitrary data types.
+	 */
+	transform<
+		TSelf extends AnyColumnBuilder,
+		TDbType extends IndexedDbCompatibleType,
+	>(
+		this: TSelf,
+		fn: NonNullable<BaseColumnBuilderConfig<TSelf["_state"]>["transformer"]>,
+	): WithTransform<TSelf, TDbType> {
+		return this._factory({ transformer: fn }) as never;
+	}
+
+	/** `Update`s the cell when the row is updated without providing a respective value.
+	 *
+	 * Differs from `.default()` in the sense that it is only applied on `update`s to the relevant column, assuming a value wasn't explictly provided by the input.
+	 *
+	 * The column will be optional in it's `insert` type.
+	 *
+	 * NOTE: Overrides `.nullable()`. Is overridden by `.computed()`, `.readonly()`.
+	 */
+	update<TSelf extends AnyColumnBuilder>(
+		this: TSelf,
+		valOrFn: NonNullable<BaseColumnBuilderConfig<TSelf["_state"]>["updater"]>,
+	): true extends CanHaveUpdateVal<TSelf["_state"]>
+		? WithUpdate<TSelf>
+		: TSelf["_err"]["updater"] {
+		const { isReadonly, computation } = this._config;
+
+		if (isReadonly || isNotUndefined(computation))
+			throw Error(this._err.updater);
+
+		return this._factory({ isNullable: false, updater: valOrFn }) as never;
+	}
+
+	/** Enforces that values in this column must be unique.
+	 *
+	 * Implictly creates an index for this column.
+	 *
+	 * NOTE: Overrides `.index()`.
+	 *
+	 * @param name unique index name
+	 */
+	unique<
+		TSelf extends AnyColumnBuilder,
+		const TIdxName extends string = `${TName}_unique_idx`,
+	>(this: TSelf, name?: TIdxName): WithUnique<TSelf, TIdxName> {
+		return this._factory({
+			indexName: name ?? `${this.name}_unique_idx`,
+			isUniqueIndex: true,
+		}) as never;
+	}
+
+	/** Validates inputs during inserts and updates.
+	 *
+	 * @param fn validator function. Returns true if successful, false if unsuccessful, or a string for a custom error message
+	 */
+	validate<TSelf extends AnyColumnBuilder>(
+		this: TSelf,
+		fn: (val: TSelf["_state"]["type"]) => Promisable<boolean | string>,
+	): TSelf {
+		return this._factory({ validator: fn }) as never;
+	}
+}
+
+export class Column {}
