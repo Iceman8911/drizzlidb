@@ -6,20 +6,24 @@ export type PromisfyMethodReturnType<TObj extends Record<string, unknown>> = {
 
 export type Satisfies<TNarrow extends TWide, TWide> = TNarrow;
 
+export type IndexedDbPrimitiveType = number | string | boolean | null | bigint;
+
+export type IndexedDbBinaryType = ArrayBuffer | Uint8Array | Blob | File;
+
+// TODO: Export this in an entrypoint
+export type IndexedDbJsonType =
+	| IndexedDbPrimitiveType
+	| IndexedDbJsonType[]
+	| { [key: string]: IndexedDbJsonType | IndexedDbJsonType[] };
+
+// TODO: Export this in an entrypoint
 export type IndexedDbCompatibleType =
-	| number
-	| string
-	| boolean
-	| null
-	| bigint
+	| IndexedDbPrimitiveType
 	| Date
 	| RegExp
-	| ArrayBuffer
-	| ArrayBufferView
-	| DataView
-	| Blob
-	| File
+	| IndexedDbBinaryType
 	| IndexedDbCompatibleType[]
+	| IndexedDbJsonType
 	| { [key: string]: IndexedDbCompatibleType }
 	| Map<IndexedDbCompatibleType, IndexedDbCompatibleType>
 	| Set<IndexedDbCompatibleType>;

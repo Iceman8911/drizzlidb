@@ -11,17 +11,15 @@ export interface BaseColumnGenerics {
 	isNullable: boolean;
 	hasDefaultVal: boolean;
 	hasUpdateVal: boolean;
-	// enumType: string | undefined
 	isUniqueIndex: boolean;
 	isIndex: boolean;
 	indexName: string;
-	isMultiEntryIndex: boolean;
 	isPrimaryKey: boolean;
 	isComputed: boolean;
 	isReadonly: boolean;
 }
 
-type AnyColumnBuilder = BaseColumnBuilder<
+export type AnyBaseColumnBuilder = BaseColumnBuilder<
 	string,
 	Record<keyof BaseColumnGenerics, any>
 >;
@@ -36,7 +34,6 @@ export type DefaultBaseColumnGenerics = Satisfies<
 		isUniqueIndex: false;
 		isIndex: false;
 		indexName: string;
-		isMultiEntryIndex: false;
 		isPrimaryKey: false;
 		isComputed: false;
 		isReadonly: false;
@@ -84,15 +81,10 @@ export type BaseColumnBuilderConfig<
 
 	defaultVal?: TGenerics["type"] | (() => Promisable<TGenerics["type"]>);
 	updater?: TGenerics["type"] | (() => Promisable<TGenerics["type"]>);
-	validator?: (val: TGenerics["type"]) => Promisable<boolean | string>;
-	transformer?: {
-		fromDb: (val: TGenerics["dbType"]) => Promisable<TGenerics["type"]>;
-		toDb: (val: TGenerics["type"]) => Promisable<TGenerics["dbType"]>;
-	};
+	validator?: Array<(val: TGenerics["type"]) => Promisable<boolean | string>>;
 	computation?: () => Promisable<TGenerics["type"]>;
 
 	isNullable?: boolean;
-	isMultiEntryIndex?: boolean;
 	isUniqueIndex?: boolean;
 	isPrimaryKey?: boolean;
 	isReadonly?: boolean;
@@ -101,7 +93,7 @@ export type BaseColumnBuilderConfig<
 export const DEFAULT_COLUMN_BUILDER_CONFIG =
 	{} as const satisfies BaseColumnBuilderConfig;
 
-export type GetColumnBuilderState<TBuilder extends AnyColumnBuilder> =
+export type GetColumnBuilderState<TBuilder extends AnyBaseColumnBuilder> =
 	TBuilder extends {
 		readonly _state: infer RGenerics;
 	}
@@ -110,7 +102,7 @@ export type GetColumnBuilderState<TBuilder extends AnyColumnBuilder> =
 
 /** Workaround for self-referencing generic? */
 export type WithColumnBuilderState<
-	TBuilder extends AnyColumnBuilder,
+	TBuilder extends AnyBaseColumnBuilder,
 	TUpdates extends Partial<BaseColumnGenerics>,
 > = Merge<
 	TBuilder,
@@ -130,41 +122,38 @@ export type WithColumnBuilderState<
 // ----------------------------------
 
 type WithBrand<
-	TBuilder extends AnyColumnBuilder,
+	TBuilder extends AnyBaseColumnBuilder,
 	TBrand extends string,
 > = WithColumnBuilderState<
 	TBuilder,
 	{ type: { __brand: TBrand } & GetColumnBuilderState<TBuilder>["type"] }
 >;
 
-type WithComputed<TBuilder extends AnyColumnBuilder> = WithColumnBuilderState<
-	TBuilder,
-	{
-		isComputed: true;
-		isReadonly: true;
-		isNullable: false;
-		hasDefaultVal: false;
-		hasUpdateVal: false;
-	}
->;
+type WithComputed<TBuilder extends AnyBaseColumnBuilder> =
+	WithColumnBuilderState<
+		TBuilder,
+		{
+			isComputed: true;
+			isReadonly: true;
+			isNullable: false;
+			hasDefaultVal: false;
+			hasUpdateVal: false;
+		}
+	>;
 
-type WithDefault<TBuilder extends AnyColumnBuilder> = WithColumnBuilderState<
-	TBuilder,
-	{ hasDefaultVal: true; isNullable: false }
->;
+export type WithDefault<TBuilder extends AnyBaseColumnBuilder> =
+	WithColumnBuilderState<TBuilder, { hasDefaultVal: true; isNullable: false }>;
 
 type WithIndex<
-	TBuilder extends AnyColumnBuilder,
+	TBuilder extends AnyBaseColumnBuilder,
 	TIdxName extends string = string,
 > = WithColumnBuilderState<TBuilder, { indexName: TIdxName; isIndex: true }>;
 
-type WithNullable<TBuilder extends AnyColumnBuilder> = WithColumnBuilderState<
-	TBuilder,
-	{ isNullable: true }
->;
+type WithNullable<TBuilder extends AnyBaseColumnBuilder> =
+	WithColumnBuilderState<TBuilder, { isNullable: true }>;
 
 type WithPrimary<
-	TBuilder extends AnyColumnBuilder,
+	TBuilder extends AnyBaseColumnBuilder,
 	TIdxName extends string = string,
 > = WithColumnBuilderState<
 	TBuilder,
@@ -177,23 +166,17 @@ type WithPrimary<
 	}
 >;
 
-type WithReadonly<TBuilder extends AnyColumnBuilder> = WithColumnBuilderState<
-	TBuilder,
-	{ isReadonly: true; isNullable: false; hasUpdateVal: false }
->;
+type WithReadonly<TBuilder extends AnyBaseColumnBuilder> =
+	WithColumnBuilderState<
+		TBuilder,
+		{ isReadonly: true; isNullable: false; hasUpdateVal: false }
+	>;
 
-type WithTransform<
-	TBuilder extends AnyColumnBuilder,
-	TDbType extends IndexedDbCompatibleType,
-> = WithColumnBuilderState<TBuilder, { dbType: TDbType }>;
-
-type WithUpdate<TBuilder extends AnyColumnBuilder> = WithColumnBuilderState<
-	TBuilder,
-	{ hasUpdateVal: true; isNullable: false }
->;
+export type WithUpdate<TBuilder extends AnyBaseColumnBuilder> =
+	WithColumnBuilderState<TBuilder, { hasUpdateVal: true; isNullable: false }>;
 
 type WithUnique<
-	TBuilder extends AnyColumnBuilder,
+	TBuilder extends AnyBaseColumnBuilder,
 	TIdxName extends string = string,
 > = WithColumnBuilderState<
 	TBuilder,
@@ -240,21 +223,26 @@ export abstract class BaseColumnBuilder<
 		updater: "🚨 Cannot add an updater to a readonly or computed column.",
 	} as const;
 
+	/** If `.name` is specified, this is set to `.name` else a randomly generated string. */
+	readonly _randName: string;
+
 	/** Type-level only generic state. Use this over `TGenerics`.
 	 *
 	 * @internal
 	 */
 	declare readonly _state: TGenerics;
 
-	readonly name: TName;
+	/** If specified, this name will be pritoritzed as the column name when built. */
+	readonly name?: TName;
 
 	constructor(
-		name: TName = getRandomUuid() as TName,
+		name?: TName,
 		config: BaseColumnBuilderConfig<typeof this._state> = clone(
 			DEFAULT_COLUMN_BUILDER_CONFIG,
 		),
 	) {
 		this.name = name;
+		this._randName = name ?? getRandomUuid();
 		this._config = config;
 	}
 
@@ -262,7 +250,7 @@ export abstract class BaseColumnBuilder<
 	 * @internal
 	 */
 	_factory<
-		TSelf extends AnyColumnBuilder,
+		TSelf extends AnyBaseColumnBuilder,
 		TUpdates extends Partial<BaseColumnGenerics>,
 		TConfig extends Partial<BaseColumnBuilderConfig<any>> = Partial<
 			BaseColumnBuilderConfig<TSelf["_state"]>
@@ -271,6 +259,10 @@ export abstract class BaseColumnBuilder<
 		return new this._ctor(this.name, {
 			...this._config,
 			...updates,
+			validator: [
+				...(this._config.validator ?? []),
+				...(updates.validator ?? []),
+			],
 		});
 	}
 
@@ -278,7 +270,7 @@ export abstract class BaseColumnBuilder<
 	 *
 	 * Runtime-only.
 	 */
-	brand<const TBrand extends string, TSelf extends AnyColumnBuilder>(
+	brand<const TBrand extends string, TSelf extends AnyBaseColumnBuilder>(
 		this: TSelf,
 		_brand: TBrand,
 	): WithBrand<TSelf, TBrand> {
@@ -295,7 +287,7 @@ export abstract class BaseColumnBuilder<
 	 *
 	 * @param ref reference to the table to compute from, e.g () => UserTable
 	 */
-	computed<TSelf extends AnyColumnBuilder, TTable>(
+	computed<TSelf extends AnyBaseColumnBuilder, TTable>(
 		this: TSelf,
 		ref: () => TTable,
 		compute: (table: TTable) => Promisable<TSelf["_state"]["type"]>,
@@ -319,7 +311,7 @@ export abstract class BaseColumnBuilder<
 	 *
 	 * NOTE: Overrides `.nullable()`. Is overidden by `.computed()`.
 	 */
-	default<TSelf extends AnyColumnBuilder>(
+	default<TSelf extends AnyBaseColumnBuilder>(
 		this: TSelf,
 		valOrFn: NonNullable<
 			BaseColumnBuilderConfig<TSelf["_state"]>["defaultVal"]
@@ -343,7 +335,7 @@ export abstract class BaseColumnBuilder<
 	 * @param name index name
 	 */
 	index<
-		TSelf extends AnyColumnBuilder,
+		TSelf extends AnyBaseColumnBuilder,
 		const TIdxName extends string = `${TName}_idx`,
 	>(
 		this: TSelf,
@@ -356,7 +348,7 @@ export abstract class BaseColumnBuilder<
 		if (isNotUndefined(oldIdxName)) throw Error(this._err.index(oldIdxName));
 
 		return this._factory({
-			indexName: name ?? `${this.name}_idx`,
+			indexName: name ?? `${this._randName}_idx`,
 		}) as never;
 	}
 
@@ -366,7 +358,7 @@ export abstract class BaseColumnBuilder<
 	 *
 	 * NOTE: Is overridden by `.default()`, `.update()`, `.computed()`, `.readonly()`, `.primary()`.
 	 */
-	nullable<TSelf extends AnyColumnBuilder>(
+	nullable<TSelf extends AnyBaseColumnBuilder>(
 		this: TSelf,
 	): true extends CanBeNullable<TSelf["_state"]>
 		? WithNullable<TSelf>
@@ -395,11 +387,11 @@ export abstract class BaseColumnBuilder<
 	 * @param name primary key index name
 	 */
 	primary<
-		TSelf extends AnyColumnBuilder,
+		TSelf extends AnyBaseColumnBuilder,
 		const TIdxName extends string = `${TName}_primary_idx`,
 	>(this: TSelf, name?: TIdxName): WithPrimary<TSelf, TIdxName> {
 		return this._factory({
-			indexName: name ?? `${this.name}_primary_idx`,
+			indexName: name ?? `${this._randName}_primary_idx`,
 			isNullable: false,
 			isPrimaryKey: true,
 			isUniqueIndex: true,
@@ -412,28 +404,14 @@ export abstract class BaseColumnBuilder<
 	 *
 	 * NOTE: Overrides `.nullable()`, `.update()`.
 	 */
-	readonly<TSelf extends AnyColumnBuilder>(this: TSelf): WithReadonly<TSelf> {
+	readonly<TSelf extends AnyBaseColumnBuilder>(
+		this: TSelf,
+	): WithReadonly<TSelf> {
 		return this._factory({
 			isNullable: false,
 			isReadonly: true,
 			updater: undefined,
 		}) as never;
-	}
-
-	/** Converts data into types compatible with IndexedDB.
-	 *
-	 * Valuable for custom classes and the like.
-	 *
-	 * TODO: move this over to the `CustomColumnBuilder` since that will accept arbitrary data types.
-	 */
-	transform<
-		TSelf extends AnyColumnBuilder,
-		TDbType extends IndexedDbCompatibleType,
-	>(
-		this: TSelf,
-		fn: NonNullable<BaseColumnBuilderConfig<TSelf["_state"]>["transformer"]>,
-	): WithTransform<TSelf, TDbType> {
-		return this._factory({ transformer: fn }) as never;
 	}
 
 	/** `Update`s the cell when the row is updated without providing a respective value.
@@ -444,7 +422,7 @@ export abstract class BaseColumnBuilder<
 	 *
 	 * NOTE: Overrides `.nullable()`. Is overridden by `.computed()`, `.readonly()`.
 	 */
-	update<TSelf extends AnyColumnBuilder>(
+	update<TSelf extends AnyBaseColumnBuilder>(
 		this: TSelf,
 		valOrFn: NonNullable<BaseColumnBuilderConfig<TSelf["_state"]>["updater"]>,
 	): true extends CanHaveUpdateVal<TSelf["_state"]>
@@ -467,24 +445,26 @@ export abstract class BaseColumnBuilder<
 	 * @param name unique index name
 	 */
 	unique<
-		TSelf extends AnyColumnBuilder,
+		TSelf extends AnyBaseColumnBuilder,
 		const TIdxName extends string = `${TName}_unique_idx`,
 	>(this: TSelf, name?: TIdxName): WithUnique<TSelf, TIdxName> {
 		return this._factory({
-			indexName: name ?? `${this.name}_unique_idx`,
+			indexName: name ?? `${this._randName}_unique_idx`,
 			isUniqueIndex: true,
 		}) as never;
 	}
 
 	/** Validates inputs during inserts and updates.
 	 *
-	 * @param fn validator function. Returns true if successful, false if unsuccessful, or a string for a custom error message
+	 * @param fns validator functions. Returns true if successful, false if unsuccessful, or a string for a custom error message
 	 */
-	validate<TSelf extends AnyColumnBuilder>(
+	validate<TSelf extends AnyBaseColumnBuilder>(
 		this: TSelf,
-		fn: (val: TSelf["_state"]["type"]) => Promisable<boolean | string>,
+		...fns: Array<
+			(val: TSelf["_state"]["type"]) => Promisable<boolean | string>
+		>
 	): TSelf {
-		return this._factory({ validator: fn }) as never;
+		return this._factory({ validator: fns }) as never;
 	}
 }
 
