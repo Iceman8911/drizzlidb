@@ -8,7 +8,7 @@ import {
 	DEFAULT_COLUMN_BUILDER_CONFIG,
 	type DefaultBaseColumnGenerics,
 	type WithColumnBuilderState,
-} from "./column";
+} from "./base";
 
 interface NumberColumnGenerics extends BaseColumnGenerics {
 	type: number;
@@ -61,7 +61,6 @@ class _NumberColumnBuilder<
 > extends BaseColumnBuilder<TName, TGenerics> {
 	/** @internal */
 	readonly _numErr = {
-		...this._err,
 		autoIncrement: "🚨 Only `.primary()` keys can be autoincremented once.",
 	} as const;
 
@@ -95,9 +94,7 @@ class _NumberColumnBuilder<
 			TSelf,
 			Partial<NumberColumnGenerics>,
 			NumberColumnBuilderConfig
-		>({
-			isAutoIncrementing: true,
-		}) as never;
+		>({ isAutoIncrementing: true }) as never;
 	}
 }
 

@@ -1,0 +1,120 @@
+/** biome-ignore-all lint/suspicious/noExplicitAny: <Generics stuff> */
+import type { Promisable } from "type-fest";
+import type { IndexedDbCompatibleType, Satisfies } from "../../shared/types";
+import { clone } from "../../shared/util";
+import {
+	BaseColumnBuilder,
+	type BaseColumnBuilderConfig,
+	type BaseColumnGenerics,
+	DEFAULT_COLUMN_BUILDER_CONFIG,
+	type DefaultBaseColumnGenerics,
+	type WithColumnBuilderState,
+} from "./base";
+
+interface CustomColumnGenerics extends BaseColumnGenerics {
+	type: unknown;
+}
+
+type DefaultCustomColumnGenerics<
+	TType = unknown,
+	TDbType extends IndexedDbCompatibleType = IndexedDbCompatibleType,
+> = Satisfies<
+	Omit<DefaultBaseColumnGenerics, "type" | "dbType"> & {
+		type: TType;
+		dbType: TDbType;
+	},
+	CustomColumnGenerics
+>;
+
+type AnyCustomColumnBuilder = _CustomColumnBuilder<
+	string,
+	Record<keyof CustomColumnGenerics, any>
+>;
+
+interface CustomColumnBuilderConfig<
+	TGenerics extends CustomColumnGenerics = DefaultCustomColumnGenerics,
+> extends BaseColumnBuilderConfig<TGenerics> {
+	transformer: {
+		fromDb: (val: TGenerics["dbType"]) => Promisable<TGenerics["type"]>;
+		toDb: (val: TGenerics["type"]) => Promisable<TGenerics["dbType"]>;
+	};
+}
+
+const DEFAULT_CUSTOM_COLUMN_BUILDER_CONFIG = {
+	...DEFAULT_COLUMN_BUILDER_CONFIG,
+	transformer: {
+		fromDb: (val) => JSON.parse(JSON.stringify(val)),
+		toDb: JSON.stringify,
+	},
+} as const satisfies CustomColumnBuilderConfig;
+
+type WithTransform<
+	TBuilder extends AnyCustomColumnBuilder,
+	TType,
+	TDbType extends IndexedDbCompatibleType,
+> = WithColumnBuilderState<TBuilder, { dbType: TDbType; type: TType }>;
+
+/** For custom types without a specific builder here. Like custom classes. */
+class _CustomColumnBuilder<
+	const TName extends string = string,
+	const TGenerics extends CustomColumnGenerics = DefaultCustomColumnGenerics,
+> extends BaseColumnBuilder<TName, TGenerics> {
+	override readonly _config: CustomColumnBuilderConfig<typeof this._state>;
+
+	constructor(
+		name?: TName,
+		config: CustomColumnBuilderConfig<TGenerics> = clone(
+			DEFAULT_CUSTOM_COLUMN_BUILDER_CONFIG,
+		),
+	) {
+		super(name, config);
+
+		this._config = config;
+	}
+
+	/** Defines how custom data should be converted into and from types compatible with IndexedDB.
+	 *
+	 * Valuable for custom classes and anything else that cannot be natively represented in indexedDB.
+	 */
+	codec<
+		TSelf extends AnyCustomColumnBuilder,
+		TType = TSelf["_state"]["type"],
+		TDbType extends IndexedDbCompatibleType = TSelf["_state"]["dbType"],
+	>(
+		this: TSelf,
+		fn: NonNullable<
+			CustomColumnBuilderConfig<
+				Omit<TSelf["_state"], "type" | "dbType"> & {
+					type: TType;
+					dbType: TDbType;
+				}
+			>["transformer"]
+		>,
+	): WithTransform<TSelf, TType, TDbType> {
+		return this._factory<
+			TSelf,
+			TGenerics,
+			CustomColumnBuilderConfig<
+				Omit<TSelf["_state"], "type" | "dbType"> & {
+					type: TType;
+					dbType: TDbType;
+				}
+			>
+		>({
+			transformer: fn,
+		}) as never;
+	}
+}
+
+// TODO: Consider if it's better to force codecs in the constructor arg.
+/** Please setup the transformations with `.codec()` since the default conversion relies on `JSON.stringify` / `JSON.parse`. */
+export const CustomColumnBuilder = <
+	const TName extends string,
+	TType,
+	TDbType extends IndexedDbCompatibleType,
+>(
+	name?: TName,
+) =>
+	new _CustomColumnBuilder<TName, DefaultCustomColumnGenerics<TType, TDbType>>(
+		name,
+	);

@@ -1,0 +1,89 @@
+/** biome-ignore-all lint/suspicious/noExplicitAny: <Generics stuff> */
+import type { IndexedDbBinaryType, Satisfies } from "../../shared/types";
+import { clone } from "../../shared/util";
+import {
+	type AnyBaseColumnBuilder,
+	BaseColumnBuilder,
+	type BaseColumnBuilderConfig,
+	type BaseColumnGenerics,
+	DEFAULT_COLUMN_BUILDER_CONFIG,
+	type DefaultBaseColumnGenerics,
+	type WithColumnBuilderState,
+} from "./base";
+
+interface UnionToBinary {
+	blob: Blob;
+	uint8Array: Uint8Array;
+	arrayBuffer: ArrayBuffer;
+	file: File;
+}
+
+type Binary = Satisfies<
+	UnionToBinary[keyof UnionToBinary],
+	IndexedDbBinaryType
+>;
+
+interface BinaryColumnGenerics extends BaseColumnGenerics {
+	type: Binary;
+	dbType: Binary;
+}
+
+type WithType<
+	TBuilder extends AnyBaseColumnBuilder,
+	TType extends keyof UnionToBinary,
+> = WithColumnBuilderState<
+	TBuilder,
+	{ type: UnionToBinary[TType]; dbType: UnionToBinary[TType] }
+>;
+
+type DefaultBinaryColumnGenerics<TType extends Binary = Binary> = Satisfies<
+	Omit<DefaultBaseColumnGenerics, "type" | "dbType"> & {
+		type: TType;
+		dbType: TType;
+	},
+	BinaryColumnGenerics
+>;
+
+interface BinaryColumnBuilderConfig<
+	TGenerics extends BinaryColumnGenerics = DefaultBinaryColumnGenerics,
+> extends BaseColumnBuilderConfig<TGenerics> {}
+
+const DEFAULT_BINARY_COLUMN_BUILDER_CONFIG = {
+	...DEFAULT_COLUMN_BUILDER_CONFIG,
+} as const satisfies BinaryColumnBuilderConfig;
+
+class _BinaryColumnBuilder<
+	const TName extends string = string,
+	const TGenerics extends BinaryColumnGenerics = DefaultBinaryColumnGenerics,
+> extends BaseColumnBuilder<TName, TGenerics> {
+	override readonly _config: BinaryColumnBuilderConfig<typeof this._state>;
+
+	constructor(
+		name?: TName,
+		config: BinaryColumnBuilderConfig<TGenerics> = clone(
+			DEFAULT_BINARY_COLUMN_BUILDER_CONFIG,
+		),
+	) {
+		super(name, config);
+
+		this._config = config;
+	}
+
+	/** Specify the specific kind of binary data.
+	 *
+	 * @param _type no runtime use. purely for type inference.
+	 */
+	type<TType extends keyof UnionToBinary, TSelf extends AnyBaseColumnBuilder>(
+		this: TSelf,
+		_type: TType,
+	): WithType<TSelf, TType> {
+		return this as never;
+	}
+}
+
+export const BinaryColumnBuilder = <
+	const TName extends string,
+	TType extends Binary,
+>(
+	name?: TName,
+) => new _BinaryColumnBuilder<TName, DefaultBinaryColumnGenerics<TType>>(name);
