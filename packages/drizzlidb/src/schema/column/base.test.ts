@@ -1,6 +1,6 @@
 import { describe, expect, expectTypeOf, it } from "bun:test";
 import type { Satisfies } from "../../shared/types";
-import { BaseColumnBuilder, type BaseColumnGenerics } from "./column";
+import { BaseColumnBuilder, type BaseColumnGenerics } from "./base";
 
 describe(BaseColumnBuilder.name, () => {
 	/** Since `BaseColumnBuilder` is abstract, we extend it with a dummy wrapper. */
@@ -140,26 +140,13 @@ describe(BaseColumnBuilder.name, () => {
 		>().toEqualTypeOf<false>();
 	});
 
-	it("should configure transformation and validation callbacks", () => {
-		const transformBuilder = new TestColumnBuilder<
-			"custom",
-			StringColumnGenerics
-		>("custom").transform({
-			fromDb: (val) => val,
-			toDb: (val) => val,
-		});
-
-		expect(transformBuilder._config.transformer).not.toBeUndefined();
-		expectTypeOf<
-			(typeof transformBuilder)["_state"]["type"]
-		>().toEqualTypeOf<string>();
-
+	it("should configure validation callbacks", () => {
 		const validatedBuilder = new TestColumnBuilder<
 			"validated",
 			StringColumnGenerics
 		>("validated").validate((val) => val.length > 0);
 
-		expect(validatedBuilder._config.validator).toBeInstanceOf(Function);
+		expect(validatedBuilder._config.validator?.[0]).toBeInstanceOf(Function);
 		expectTypeOf<
 			(typeof validatedBuilder)["_state"]["type"]
 		>().toEqualTypeOf<string>();
