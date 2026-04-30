@@ -6,6 +6,7 @@
 				"organizeImports": "on",
 				"recommended": true,
 				"useSortedAttributes": "on",
+				"useSortedInterfaceMembers": "on",
 				"useSortedKeys": "on",
 				"useSortedProperties": "on"
 			}
