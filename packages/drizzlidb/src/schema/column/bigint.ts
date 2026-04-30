@@ -1,23 +1,18 @@
 /** biome-ignore-all lint/suspicious/noExplicitAny: <Generics stuff> */
 import type { Satisfies } from "../../shared/types";
-import { clone, isNotUndefined } from "../../shared/util";
+import { clone } from "../../shared/util";
 import {
 	BaseColumnBuilder,
 	type BaseColumnBuilderConfig,
 	type BaseColumnGenerics,
 	DEFAULT_COLUMN_BUILDER_CONFIG,
 	type DefaultBaseColumnGenerics,
-	type WithColumnBuilderState,
 } from "./base";
-import {
-	COLUMN_BUILDER_GENERATED_ERROR_TEXT,
-	type ColumnBuilderGenericWithGenerated,
-	type ColumnBuilderWithGenerated,
-} from "./shared/generated";
+import { _SharedColumnBuilderWithGenerated } from "./shared/generated";
 
 interface BigIntColumnGenerics
 	extends BaseColumnGenerics,
-		ColumnBuilderGenericWithGenerated {
+		_SharedColumnBuilderWithGenerated.Generics {
 	type: bigint;
 	dbType: bigint;
 }
@@ -44,38 +39,21 @@ const DEFAULT_NUMBER_COLUMN_BUILDER_CONFIG = {
 	...DEFAULT_COLUMN_BUILDER_CONFIG,
 } as const satisfies BigIntColumnBuilderConfig;
 
-type WithBigIntColumnBuilderState<
-	TBuilder extends AnyBigIntColumnBuilder,
-	TUpdates extends Partial<BigIntColumnGenerics>,
-> = WithColumnBuilderState<TBuilder, TUpdates>;
-
-type WithGenerated<TBuilder extends AnyBigIntColumnBuilder> =
-	WithBigIntColumnBuilderState<
-		TBuilder,
-		{ isGenerated: true; hasDefaultVal: true; isReadonly: true }
-	>;
-
-type CanGenerate<TGenerics extends BigIntColumnGenerics> =
-	true extends TGenerics["isGenerated"]
-		? false
-		: true extends TGenerics["hasDefaultVal"]
-			? false
-			: true extends TGenerics["hasUpdateVal"]
-				? false
-				: true extends TGenerics["isComputed"]
-					? false
-					: true;
+// type WithBigIntColumnBuilderState<
+// 	TBuilder extends AnyBigIntColumnBuilder,
+// 	TUpdates extends Partial<BigIntColumnGenerics>,
+// > = WithColumnBuilderState<TBuilder, TUpdates>;
 
 class _BigIntColumnBuilder<
 		const TName extends string = string,
 		const TGenerics extends BigIntColumnGenerics = DefaultBigIntColumnGenerics,
 	>
 	extends BaseColumnBuilder<TName, TGenerics>
-	implements ColumnBuilderWithGenerated
+	implements _SharedColumnBuilderWithGenerated.Builder
 {
 	/** @internal */
 	readonly _bigIntErr = {
-		generated: COLUMN_BUILDER_GENERATED_ERROR_TEXT,
+		generated: _SharedColumnBuilderWithGenerated.ERR_TEXT,
 	} as const;
 
 	override readonly _config: BigIntColumnBuilderConfig<typeof this._state>;
@@ -93,29 +71,23 @@ class _BigIntColumnBuilder<
 
 	generated<TSelf extends AnyBigIntColumnBuilder>(
 		this: TSelf,
-	): true extends CanGenerate<TSelf["_state"]>
-		? WithGenerated<TSelf>
+	): true extends _SharedColumnBuilderWithGenerated.CanGenerate<TSelf["_state"]>
+		? _SharedColumnBuilderWithGenerated.WithGenerated<TSelf>
 		: TSelf["_bigIntErr"]["generated"] {
-		const { defaultVal, updater, computation } = this._config;
-
-		if (
-			isNotUndefined(defaultVal) ||
-			isNotUndefined(updater) ||
-			isNotUndefined(computation)
-		)
-			throw Error(this._bigIntErr.generated);
-
-		return this._factory<
-			TSelf,
-			Partial<BigIntColumnGenerics>,
-			BigIntColumnBuilderConfig
-		>({
-			defaultVal(): bigint {
+		return _SharedColumnBuilderWithGenerated.setMethod(
+			this,
+			this._bigIntErr.generated,
+			(): bigint => {
 				const time = BigInt(Date.now());
-				const rand = BigInt(Math.floor(Math.random() * 1e6));
-				return (time << 20n) | rand;
+
+				const randBufOf32Bits = new Uint32Array(1) as Uint32Array;
+				crypto.getRandomValues(randBufOf32Bits);
+
+				const rand = BigInt(randBufOf32Bits[0] ?? 0);
+
+				return (time << 32n) | rand;
 			},
-		}) as never;
+		);
 	}
 }
 
