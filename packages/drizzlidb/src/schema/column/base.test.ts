@@ -15,8 +15,9 @@ describe(BaseColumnBuilder.name, () => {
 
 	type StringColumnGenerics = Satisfies<
 		{
-			type: string;
-			dbType: string;
+			insertType: string;
+			updateType: string;
+			selectType: string;
 			isNullable: false;
 			hasDefaultVal: false;
 			hasUpdateVal: false;
@@ -44,12 +45,20 @@ describe(BaseColumnBuilder.name, () => {
 			"toBrand",
 		);
 
-		expectTypeOf<typeof builder._state.type>().toBeString();
+		expectTypeOf<typeof builder._state.insertType>().toBeString();
+		expectTypeOf<typeof builder._state.selectType>().toBeString();
+		expectTypeOf<typeof builder._state.updateType>().toBeString();
 
 		const brandedBuilder = builder.brand("testBrand");
 
 		expectTypeOf<
-			typeof brandedBuilder._state.type.__brand
+			typeof brandedBuilder._state.insertType.__brand
+		>().toEqualTypeOf<"testBrand">();
+		expectTypeOf<
+			typeof brandedBuilder._state.selectType.__brand
+		>().toEqualTypeOf<"testBrand">();
+		expectTypeOf<
+			typeof brandedBuilder._state.updateType.__brand
 		>().toEqualTypeOf<"testBrand">();
 	});
 
@@ -152,7 +161,7 @@ describe(BaseColumnBuilder.name, () => {
 
 		expect(validatedBuilder._config.validator?.[0]).toBeInstanceOf(Function);
 		expectTypeOf<
-			(typeof validatedBuilder)["_state"]["type"]
+			(typeof validatedBuilder)["_state"]["insertType"]
 		>().toEqualTypeOf<string>();
 	});
 

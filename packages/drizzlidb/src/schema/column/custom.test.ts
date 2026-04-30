@@ -37,10 +37,10 @@ describe(CustomColumnBuilder.name, () => {
 			toDb: (val) => val.toIdb(),
 		});
 
-		type FunctionBuilder = typeof classBuilder._state;
-		expectTypeOf<FunctionBuilder["type"]>().toEqualTypeOf<CustomClass>();
+		type ClassBuilder = typeof classBuilder._state;
+		expectTypeOf<ClassBuilder["selectType"]>().toEqualTypeOf<CustomClass>();
 		expectTypeOf<
-			FunctionBuilder["dbType"]
+			ClassBuilder["dbType"]
 		>().toEqualTypeOf<SerializedCustomClass>();
 	});
 
@@ -50,10 +50,10 @@ describe(CustomColumnBuilder.name, () => {
 			toDb: (val) => val.toIdb(),
 		});
 
-		type FunctionBuilder = typeof classBuilder._state;
-		expectTypeOf<FunctionBuilder["type"]>().toEqualTypeOf<CustomClass>();
+		type ClassBuilder = typeof classBuilder._state;
+		expectTypeOf<ClassBuilder["selectType"]>().toEqualTypeOf<CustomClass>();
 		expectTypeOf<
-			FunctionBuilder["dbType"]
+			ClassBuilder["dbType"]
 		>().toEqualTypeOf<SerializedCustomClass>();
 	});
 

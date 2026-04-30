@@ -14,14 +14,19 @@ import { _SharedColumnBuilderWithGenerated } from "./shared/generated";
 interface StringColumnGenerics
 	extends BaseColumnGenerics,
 		_SharedColumnBuilderWithGenerated.Generics {
-	type: string;
-	dbType: string;
+	insertType: string;
+	selectType: string;
+	updateType: string;
 }
 
 type DefaultStringColumnGenerics = Satisfies<
-	Omit<DefaultBaseColumnGenerics, "type" | "dbType"> & {
-		type: string;
-		dbType: string;
+	Omit<
+		DefaultBaseColumnGenerics,
+		"selectType" | "updateType" | "insertType"
+	> & {
+		selectType: string;
+		insertType: string;
+		updateType: string;
 		isGenerated: false;
 	},
 	StringColumnGenerics
@@ -43,7 +48,14 @@ const DEFAULT_STRING_COLUMN_BUILDER_CONFIG = {
 type WithEnum<
 	TBuilder extends AnyStringColumnBuilder,
 	TValues extends readonly string[],
-> = WithColumnBuilderState<TBuilder, { type: TValues[number] }>;
+> = WithColumnBuilderState<
+	TBuilder,
+	{
+		insertType: TValues[number];
+		updateType: TValues[number];
+		selectType: TValues[number];
+	}
+>;
 
 class _StringColumnBuilder<
 		const TName extends string = string,

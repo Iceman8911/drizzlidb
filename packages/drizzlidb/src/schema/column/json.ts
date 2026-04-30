@@ -12,16 +12,21 @@ import {
 } from "./base";
 
 interface JsonColumnGenerics extends BaseColumnGenerics {
-	type: IndexedDbJsonType;
-	dbType: IndexedDbJsonType;
+	insertType: IndexedDbJsonType;
+	selectType: IndexedDbJsonType;
+	updateType: IndexedDbJsonType;
 }
 
 type DefaultJsonColumnGenerics<
 	TSchema extends IndexedDbJsonType = IndexedDbJsonType,
 > = Satisfies<
-	Omit<DefaultBaseColumnGenerics, "type" | "dbType"> & {
-		type: TSchema;
-		dbType: TSchema;
+	Omit<
+		DefaultBaseColumnGenerics,
+		"selectType" | "updateType" | "insertType"
+	> & {
+		selectType: TSchema;
+		updateType: TSchema;
+		insertType: TSchema;
 	},
 	JsonColumnGenerics
 >;
@@ -42,17 +47,26 @@ const DEFAULT_JSON_COLUMN_BUILDER_CONFIG = {
 	...DEFAULT_COLUMN_BUILDER_CONFIG,
 } as const satisfies JsonColumnBuilderConfig;
 
-type InferStandardSchema<TSchema extends StandardSchemaV1> =
+type InferStandardSchemaInput<TSchema extends StandardSchemaV1> =
+	StandardSchemaV1.InferInput<TSchema> extends IndexedDbJsonType
+		? StandardSchemaV1.InferInput<TSchema>
+		: "🚨 Input schema is not a compatible JSON object.";
+
+type InferStandardSchemaOutput<TSchema extends StandardSchemaV1> =
 	StandardSchemaV1.InferOutput<TSchema> extends IndexedDbJsonType
 		? StandardSchemaV1.InferOutput<TSchema>
-		: never;
+		: "🚨 Output schema is not a compatible JSON object.";
 
 type WithStandardSchema<
 	TBuilder extends AnyJsonColumnBuilder,
 	TSchema extends StandardSchemaV1,
 > = WithColumnBuilderState<
 	TBuilder,
-	{ type: InferStandardSchema<TSchema>; dbType: InferStandardSchema<TSchema> }
+	{
+		insertType: InferStandardSchemaInput<TSchema>;
+		selectType: InferStandardSchemaOutput<TSchema>;
+		updateType: InferStandardSchemaInput<TSchema>;
+	}
 >;
 
 /** TODO: add standard schema support */

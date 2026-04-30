@@ -10,14 +10,19 @@ import {
 } from "./base";
 
 interface BooleanColumnGenerics extends BaseColumnGenerics {
-	type: boolean;
-	dbType: boolean;
+	insertType: boolean;
+	selectType: boolean;
+	updateType: boolean;
 }
 
 type DefaultBooleanColumnGenerics = Satisfies<
-	Omit<DefaultBaseColumnGenerics, "type" | "dbType"> & {
-		type: boolean;
-		dbType: boolean;
+	Omit<
+		DefaultBaseColumnGenerics,
+		"selectType" | "updateType" | "insertType"
+	> & {
+		insertType: boolean;
+		selectType: boolean;
+		updateType: boolean;
 	},
 	BooleanColumnGenerics
 >;

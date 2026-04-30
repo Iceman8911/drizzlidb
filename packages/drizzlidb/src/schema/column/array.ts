@@ -1,6 +1,6 @@
 /** biome-ignore-all lint/suspicious/noExplicitAny: <Generics stuff> */
 
-import type { IndexedDbCompatibleType, Satisfies } from "../../shared/types";
+import type { Satisfies } from "../../shared/types";
 import { clone } from "../../shared/util";
 import {
 	type AnyBaseColumnBuilder,
@@ -42,18 +42,20 @@ type InferPrimitives<TPrimitives extends PrimitiveCtor[]> =
 		: [];
 
 interface ArrayColumnGenerics extends BaseColumnGenerics {
-	type: unknown[];
-	dbType: IndexedDbCompatibleType[];
+	insertType: unknown[];
 	isMultiEntryIndex: boolean;
+	selectType: unknown[];
+	updateType: unknown[];
 }
 
-type DefaultArrayColumnGenerics<
-	TType = unknown,
-	TDbType extends IndexedDbCompatibleType = IndexedDbCompatibleType,
-> = Satisfies<
-	Omit<DefaultBaseColumnGenerics, "type" | "dbType"> & {
-		type: TType[];
-		dbType: TDbType[];
+type DefaultArrayColumnGenerics<TType = unknown> = Satisfies<
+	Omit<
+		DefaultBaseColumnGenerics,
+		"selectType" | "updateType" | "insertType"
+	> & {
+		selectType: TType[];
+		updateType: TType[];
+		insertType: TType[];
 		isMultiEntryIndex: false;
 	},
 	ArrayColumnGenerics
@@ -103,7 +105,10 @@ type IfCannotHaveUnique<T extends AnyBaseColumnBuilder> =
 type WithOf<
 	TBuilder extends AnyArrayColumnBuilder,
 	TType extends InferPrimitive<PrimitiveCtor>,
-> = WithColumnBuilderState<TBuilder, { type: TType[]; dbType: TType[] }>;
+> = WithColumnBuilderState<
+	TBuilder,
+	{ selectType: TType[]; updateType: TType[]; insertType: TType[] }
+>;
 
 type WithUniqueIndex<
 	TBuilder extends AnyBaseColumnBuilder,
@@ -247,7 +252,6 @@ export const ArrayColumnBuilder = <
 >(
 	name?: TName,
 ) =>
-	new _ArrayColumnBuilder<
-		TName,
-		DefaultArrayColumnGenerics<TTPrimitiveType, TTPrimitiveType>
-	>(name);
+	new _ArrayColumnBuilder<TName, DefaultArrayColumnGenerics<TTPrimitiveType>>(
+		name,
+	);

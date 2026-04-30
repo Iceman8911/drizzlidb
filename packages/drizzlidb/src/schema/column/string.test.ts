@@ -6,7 +6,15 @@ describe(StringColumnBuilder.name, () => {
 		const b = StringColumnBuilder().enum(["a", "b"]);
 
 		expect(b._config.validator?.[0]).toBeFunction();
-		expectTypeOf<(typeof b)["_state"]["type"]>().toEqualTypeOf<"a" | "b">();
+		expectTypeOf<(typeof b)["_state"]["insertType"]>().toEqualTypeOf<
+			"a" | "b"
+		>();
+		expectTypeOf<(typeof b)["_state"]["selectType"]>().toEqualTypeOf<
+			"a" | "b"
+		>();
+		expectTypeOf<(typeof b)["_state"]["updateType"]>().toEqualTypeOf<
+			"a" | "b"
+		>();
 	});
 
 	it("should allow generated string columns and preserve generated state", () => {

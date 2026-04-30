@@ -8,7 +8,9 @@ describe(NumberColumnBuilder.name, () => {
 		expect(namedBuilder.name).toBe("count");
 		expect(!!namedBuilder._config.isAutoIncrementing).toBe(false);
 		expectTypeOf<
-			(typeof namedBuilder)["_state"]["type"]
+			(typeof namedBuilder)["_state"]["insertType"] &
+				(typeof namedBuilder)["_state"]["selectType"] &
+				(typeof namedBuilder)["_state"]["updateType"]
 		>().toEqualTypeOf<number>();
 		expectTypeOf<
 			(typeof namedBuilder)["_state"]["isAutoIncrementing"]

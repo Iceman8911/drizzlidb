@@ -8,13 +8,13 @@ describe(BigIntColumnBuilder.name, () => {
 		expect(builder.name).toBe("count");
 		expect(!!builder._config.defaultVal).toBe(false);
 
-		expectTypeOf<(typeof builder)["_state"]["type"]>().toEqualTypeOf<bigint>();
+		type builder = typeof builder._state;
+
 		expectTypeOf<
-			(typeof builder)["_state"]["hasDefaultVal"]
-		>().toEqualTypeOf<false>();
-		expectTypeOf<
-			(typeof builder)["_state"]["isGenerated"]
-		>().toEqualTypeOf<false>();
+			builder["insertType"] & builder["selectType"] & builder["updateType"]
+		>().toEqualTypeOf<bigint>();
+		expectTypeOf<builder["hasDefaultVal"]>().toEqualTypeOf<false>();
+		expectTypeOf<builder["isGenerated"]>().toEqualTypeOf<false>();
 	});
 
 	it("should allow generated bigint columns", () => {
@@ -23,20 +23,17 @@ describe(BigIntColumnBuilder.name, () => {
 		expect(generatedBuilder.name).toBe("id");
 		expect(generatedBuilder._config.isReadonly).toBe(true);
 		expect(generatedBuilder._config.defaultVal).toBeFunction();
-		expect(typeof generatedBuilder._config.defaultVal).toBe("function");
+
+		type generatedBuilder = typeof generatedBuilder._state;
 
 		expectTypeOf<
-			(typeof generatedBuilder)["_state"]["type"]
+			generatedBuilder["insertType"] &
+				generatedBuilder["selectType"] &
+				generatedBuilder["updateType"]
 		>().toEqualTypeOf<bigint>();
-		expectTypeOf<
-			(typeof generatedBuilder)["_state"]["isReadonly"]
-		>().toEqualTypeOf<true>();
-		expectTypeOf<
-			(typeof generatedBuilder)["_state"]["hasDefaultVal"]
-		>().toEqualTypeOf<true>();
-		expectTypeOf<
-			(typeof generatedBuilder)["_state"]["isGenerated"]
-		>().toEqualTypeOf<true>();
+		expectTypeOf<generatedBuilder["isReadonly"]>().toEqualTypeOf<true>();
+		expectTypeOf<generatedBuilder["hasDefaultVal"]>().toEqualTypeOf<true>();
+		expectTypeOf<generatedBuilder["isGenerated"]>().toEqualTypeOf<true>();
 	});
 
 	it("should reject multiple generated calls on the same builder", () => {

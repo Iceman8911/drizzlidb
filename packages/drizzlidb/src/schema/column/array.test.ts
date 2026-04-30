@@ -4,44 +4,70 @@ import { ArrayColumnBuilder } from "./array";
 describe(ArrayColumnBuilder.name, () => {
 	it("should update types upon init with generics", () => {
 		const arr1 = ArrayColumnBuilder<string, string>();
-		expectTypeOf<(typeof arr1)["_state"]["type"]>().toEqualTypeOf<string[]>();
-		expectTypeOf<(typeof arr1)["_state"]["dbType"]>().toEqualTypeOf<string[]>();
+		expectTypeOf<(typeof arr1)["_state"]["insertType"]>().toEqualTypeOf<
+			string[]
+		>();
+		expectTypeOf<(typeof arr1)["_state"]["selectType"]>().toEqualTypeOf<
+			string[]
+		>();
+		expectTypeOf<(typeof arr1)["_state"]["updateType"]>().toEqualTypeOf<
+			string[]
+		>();
 
 		const arr2 = ArrayColumnBuilder<string, string | number | Date | bigint>();
-		expectTypeOf<(typeof arr2)["_state"]["type"]>().toEqualTypeOf<
+		expectTypeOf<(typeof arr2)["_state"]["insertType"]>().toEqualTypeOf<
 			(string | number | Date | bigint)[]
 		>();
-		expectTypeOf<(typeof arr2)["_state"]["dbType"]>().toEqualTypeOf<
+		expectTypeOf<(typeof arr2)["_state"]["selectType"]>().toEqualTypeOf<
+			(string | number | Date | bigint)[]
+		>();
+		expectTypeOf<(typeof arr2)["_state"]["updateType"]>().toEqualTypeOf<
 			(string | number | Date | bigint)[]
 		>();
 	});
 
 	it("should update types with `.of()`", () => {
 		const arr1 = ArrayColumnBuilder().of(String);
-		expectTypeOf<(typeof arr1)["_state"]["type"]>().toEqualTypeOf<string[]>();
-		expectTypeOf<(typeof arr1)["_state"]["dbType"]>().toEqualTypeOf<string[]>();
+		expectTypeOf<(typeof arr1)["_state"]["insertType"]>().toEqualTypeOf<
+			string[]
+		>();
+		expectTypeOf<(typeof arr1)["_state"]["selectType"]>().toEqualTypeOf<
+			string[]
+		>();
+		expectTypeOf<(typeof arr1)["_state"]["updateType"]>().toEqualTypeOf<
+			string[]
+		>();
 
 		const arr2 = ArrayColumnBuilder().of(Number, Boolean);
-		expectTypeOf<(typeof arr2)["_state"]["type"]>().toEqualTypeOf<
+		expectTypeOf<(typeof arr2)["_state"]["insertType"]>().toEqualTypeOf<
 			(number | boolean)[]
 		>();
-		expectTypeOf<(typeof arr2)["_state"]["dbType"]>().toEqualTypeOf<
+		expectTypeOf<(typeof arr2)["_state"]["selectType"]>().toEqualTypeOf<
+			(number | boolean)[]
+		>();
+		expectTypeOf<(typeof arr2)["_state"]["updateType"]>().toEqualTypeOf<
 			(number | boolean)[]
 		>();
 
 		const arr3 = ArrayColumnBuilder().of(Date, BigInt, Number, String);
-		expectTypeOf<(typeof arr3)["_state"]["type"]>().toEqualTypeOf<
+		expectTypeOf<(typeof arr3)["_state"]["insertType"]>().toEqualTypeOf<
 			(string | number | Date | bigint)[]
 		>();
-		expectTypeOf<(typeof arr3)["_state"]["dbType"]>().toEqualTypeOf<
+		expectTypeOf<(typeof arr3)["_state"]["selectType"]>().toEqualTypeOf<
+			(string | number | Date | bigint)[]
+		>();
+		expectTypeOf<(typeof arr3)["_state"]["updateType"]>().toEqualTypeOf<
 			(string | number | Date | bigint)[]
 		>();
 
 		const arr4 = ArrayColumnBuilder().of(Boolean, BigInt, Number, String, Date);
-		expectTypeOf<(typeof arr4)["_state"]["type"]>().toEqualTypeOf<
+		expectTypeOf<(typeof arr4)["_state"]["insertType"]>().toEqualTypeOf<
 			(string | number | boolean | bigint | Date)[]
 		>();
-		expectTypeOf<(typeof arr4)["_state"]["dbType"]>().toEqualTypeOf<
+		expectTypeOf<(typeof arr4)["_state"]["insertType"]>().toEqualTypeOf<
+			(string | number | boolean | bigint | Date)[]
+		>();
+		expectTypeOf<(typeof arr4)["_state"]["updateType"]>().toEqualTypeOf<
 			(string | number | boolean | bigint | Date)[]
 		>();
 	});

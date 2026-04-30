@@ -1,22 +1,27 @@
 /** biome-ignore-all lint/suspicious/noExplicitAny: <To accept any builder type> */
 import type { Merge, Promisable } from "type-fest";
-import type { IndexedDbCompatibleType, Satisfies } from "../../shared/types";
+import type { Satisfies } from "../../shared/types";
 import { clone, getRandomUuid, isNotUndefined } from "../../shared/util";
 
 export interface BaseColumnGenerics {
-	/** The actual type provided from consumer code for storing, updating, etc */
-	type: unknown;
-	/** What is stored in indexedDB */
-	dbType: IndexedDbCompatibleType;
-	isNullable: boolean;
 	hasDefaultVal: boolean;
 	hasUpdateVal: boolean;
-	isUniqueIndex: boolean;
-	isIndex: boolean;
 	indexName: string;
-	isPrimaryKey: boolean;
+	/** Type when inserting data */
+	insertType: unknown;
 	isComputed: boolean;
+	isIndex: boolean;
+	isNullable: boolean;
+	isPrimaryKey: boolean;
 	isReadonly: boolean;
+	isUniqueIndex: boolean;
+	/** Type when reading data */
+	selectType: unknown;
+	/** Type when updating data.
+	 *
+	 * Always a union with `undefined`.
+	 */
+	updateType: unknown;
 }
 
 export type AnyBaseColumnBuilder = BaseColumnBuilder<
@@ -27,8 +32,9 @@ export type AnyBaseColumnBuilder = BaseColumnBuilder<
 export type DefaultBaseColumnGenerics = Satisfies<
 	{
 		isNullable: false;
-		type: unknown;
-		dbType: IndexedDbCompatibleType;
+		selectType: unknown;
+		insertType: unknown;
+		updateType: unknown;
 		hasDefaultVal: false;
 		hasUpdateVal: false;
 		isUniqueIndex: false;
@@ -105,10 +111,16 @@ export type BaseColumnBuilderConfig<
 	/** If present, the column is mean to be an index */
 	indexName?: string;
 
-	defaultVal?: TGenerics["type"] | (() => Promisable<TGenerics["type"]>);
-	updater?: TGenerics["type"] | (() => Promisable<TGenerics["type"]>);
-	validator?: Array<(val: TGenerics["type"]) => Promisable<boolean | string>>;
-	computation?: () => Promisable<TGenerics["type"]>;
+	defaultVal?:
+		| NonNullable<TGenerics["insertType"]>
+		| (() => Promisable<NonNullable<TGenerics["insertType"]>>);
+	updater?:
+		| NonNullable<TGenerics["insertType"]>
+		| (() => Promisable<NonNullable<TGenerics["insertType"]>>);
+	validator?: Array<
+		(val: NonNullable<TGenerics["insertType"]>) => Promisable<boolean | string>
+	>;
+	computation?: () => Promisable<NonNullable<TGenerics["selectType"]>>;
 
 	isNullable?: boolean;
 	isUniqueIndex?: boolean;
@@ -152,7 +164,17 @@ type WithBrand<
 	TBrand extends string,
 > = WithColumnBuilderState<
 	TBuilder,
-	{ type: { __brand: TBrand } & GetColumnBuilderState<TBuilder>["type"] }
+	{
+		selectType: {
+			__brand: TBrand;
+		} & GetColumnBuilderState<TBuilder>["selectType"];
+		insertType: {
+			__brand: TBrand;
+		} & GetColumnBuilderState<TBuilder>["insertType"];
+		updateType: {
+			__brand: TBrand;
+		} & GetColumnBuilderState<TBuilder>["updateType"];
+	}
 >;
 
 type WithComputed<TBuilder extends AnyBaseColumnBuilder> =
@@ -164,11 +186,22 @@ type WithComputed<TBuilder extends AnyBaseColumnBuilder> =
 			isNullable: false;
 			hasDefaultVal: false;
 			hasUpdateVal: false;
+			insertType: never;
+			updateType: never;
+			selectType: NonNullable<TBuilder["_state"]["selectType"]>;
 		}
 	>;
 
 export type WithDefault<TBuilder extends AnyBaseColumnBuilder> =
-	WithColumnBuilderState<TBuilder, { hasDefaultVal: true; isNullable: false }>;
+	WithColumnBuilderState<
+		TBuilder,
+		{
+			hasDefaultVal: true;
+			isNullable: false;
+			insertType: TBuilder["_state"]["insertType"] | undefined;
+			selectType: NonNullable<TBuilder["_state"]["selectType"]>;
+		}
+	>;
 
 type WithIndex<
 	TBuilder extends AnyBaseColumnBuilder,
@@ -176,7 +209,14 @@ type WithIndex<
 > = WithColumnBuilderState<TBuilder, { indexName: TIdxName; isIndex: true }>;
 
 type WithNullable<TBuilder extends AnyBaseColumnBuilder> =
-	WithColumnBuilderState<TBuilder, { isNullable: true }>;
+	WithColumnBuilderState<
+		TBuilder,
+		{
+			isNullable: true;
+			insertType: TBuilder["_state"]["insertType"] | undefined;
+			selectType: TBuilder["_state"]["selectType"] | null;
+		}
+	>;
 
 type WithPrimary<
 	TBuilder extends AnyBaseColumnBuilder,
@@ -189,17 +229,33 @@ type WithPrimary<
 		isPrimaryKey: true;
 		isNullable: false;
 		isIndex: true;
+		selectType: NonNullable<TBuilder["_state"]["selectType"]>;
 	}
 >;
 
 type WithReadonly<TBuilder extends AnyBaseColumnBuilder> =
 	WithColumnBuilderState<
 		TBuilder,
-		{ isReadonly: true; isNullable: false; hasUpdateVal: false }
+		{
+			isReadonly: true;
+			isNullable: false;
+			hasUpdateVal: false;
+			selectType: NonNullable<TBuilder["_state"]["selectType"]>;
+			updateType: never;
+		}
 	>;
 
 export type WithUpdate<TBuilder extends AnyBaseColumnBuilder> =
-	WithColumnBuilderState<TBuilder, { hasUpdateVal: true; isNullable: false }>;
+	WithColumnBuilderState<
+		TBuilder,
+		{
+			hasUpdateVal: true;
+			isNullable: false;
+			selectType: NonNullable<TBuilder["_state"]["selectType"]>;
+			// This commented line is unnecessary since all props in an update are optional by default
+			// updateType: TBuilder["_state"]["updateType"] | undefined
+		}
+	>;
 
 type WithUnique<
 	TBuilder extends AnyBaseColumnBuilder,
@@ -247,14 +303,17 @@ export abstract class BaseColumnBuilder<
 		default: `🚨 Cannot set \`.default()\` value on a \`.computed()\` column. ${DUPLICATED_CHAINER_ERROR_TEXT}`,
 		index: (oldIdxName: (typeof this._state)["indexName"]) =>
 			`🚨 An index named '${oldIdxName}' already exists. Try removing any \`.primary()\` or \`.unique()\`. ${DUPLICATED_CHAINER_ERROR_TEXT}` as const,
-		nullable: `🚨 Cannot enforce \`.nullable()\` when \`.computed()\`, \`.default()\`, \`.update()\`, \`.readonly()\`, \`.primary()\` is present. ${DUPLICATED_CHAINER_ERROR_TEXT}`,
+		nullable: `🚨 Cannot enforce \`.nullable()\` when \`.computed()\`, \`.default()\`, \`.update()\`, \`.generated()\`, \`.readonly()\`, \`.primary()\` is present. ${DUPLICATED_CHAINER_ERROR_TEXT}`,
 		primary: `${DUPLICATED_CHAINER_ERROR_TEXT}`,
 		readonly: `${DUPLICATED_CHAINER_ERROR_TEXT}`,
 		unique: `${DUPLICATED_CHAINER_ERROR_TEXT}`,
 		updater: `🚨 Cannot add \`.update()\` when \`.readonly()\` or \`.computed()\`. ${DUPLICATED_CHAINER_ERROR_TEXT}`,
 	} as const;
 
-	/** If `.name` is specified, this is set to `.name` else a randomly generated string. */
+	/** If `.name` is specified, this is set to `.name` else a randomly generated string.
+	 *
+	 * @internal
+	 */
 	readonly _randName: string;
 
 	/** Type-level only generic state. Use this over `TGenerics`.
@@ -321,7 +380,9 @@ export abstract class BaseColumnBuilder<
 	computed<TSelf extends AnyBaseColumnBuilder, TTable>(
 		this: TSelf,
 		ref: () => TTable,
-		compute: (table: TTable) => Promisable<TSelf["_state"]["type"]>,
+		compute: (
+			table: TTable,
+		) => Promisable<NonNullable<TSelf["_state"]["selectType"]>>,
 	): true extends CanBeComputed<TSelf["_state"]>
 		? WithComputed<TSelf>
 		: TSelf["_err"]["computed"] {
@@ -525,7 +586,7 @@ export abstract class BaseColumnBuilder<
 	validate<TSelf extends AnyBaseColumnBuilder>(
 		this: TSelf,
 		...fns: Array<
-			(val: TSelf["_state"]["type"]) => Promisable<boolean | string>
+			(val: TSelf["_state"]["insertType"]) => Promisable<boolean | string>
 		>
 	): TSelf {
 		return this._factory({ validator: fns }) as never;

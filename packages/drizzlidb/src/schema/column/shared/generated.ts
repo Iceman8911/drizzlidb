@@ -49,7 +49,7 @@ export namespace _SharedColumnBuilderWithGenerated {
 	export const setMethod = <TBuilder extends AnyBaseColumnBuilder>(
 		builder: TBuilder,
 		err: string,
-		cb: () => TBuilder["_state"]["type"],
+		cb: () => TBuilder["_state"]["selectType"],
 	) => {
 		const { defaultVal, updater, computation } = builder._config;
 

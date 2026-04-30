@@ -14,16 +14,21 @@ import { _SharedColumnBuilderWithGenerated } from "./shared/generated";
 interface NumberColumnGenerics
 	extends BaseColumnGenerics,
 		_SharedColumnBuilderWithGenerated.Generics {
-	type: number;
-	dbType: number;
+	insertType: number;
 	isAutoIncrementing: boolean;
+	selectType: number;
+	updateType: number;
 }
 
 type DefaultNumberColumnGenerics = Satisfies<
-	Omit<DefaultBaseColumnGenerics, "type" | "dbType"> & {
+	Omit<
+		DefaultBaseColumnGenerics,
+		"selectType" | "updateType" | "insertType"
+	> & {
 		isAutoIncrementing: false;
-		type: number;
-		dbType: number;
+		selectType: number;
+		insertType: number;
+		updateType: number;
 		isGenerated: false;
 	},
 	NumberColumnGenerics

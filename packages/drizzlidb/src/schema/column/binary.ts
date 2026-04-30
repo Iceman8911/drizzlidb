@@ -12,10 +12,10 @@ import {
 } from "./base";
 
 interface UnionToBinary {
-	blob: Blob;
-	uint8Array: Uint8Array;
 	arrayBuffer: ArrayBuffer;
+	blob: Blob;
 	file: File;
+	uint8Array: Uint8Array;
 }
 
 type Binary = Satisfies<
@@ -24,8 +24,9 @@ type Binary = Satisfies<
 >;
 
 interface BinaryColumnGenerics extends BaseColumnGenerics {
-	type: Binary;
-	dbType: Binary;
+	insertType: Binary;
+	selectType: Binary;
+	updateType: Binary;
 }
 
 type WithType<
@@ -33,13 +34,21 @@ type WithType<
 	TType extends keyof UnionToBinary,
 > = WithColumnBuilderState<
 	TBuilder,
-	{ type: UnionToBinary[TType]; dbType: UnionToBinary[TType] }
+	{
+		insertType: UnionToBinary[TType];
+		selectType: UnionToBinary[TType];
+		updateType: UnionToBinary[TType];
+	}
 >;
 
 type DefaultBinaryColumnGenerics<TType extends Binary = Binary> = Satisfies<
-	Omit<DefaultBaseColumnGenerics, "type" | "dbType"> & {
-		type: TType;
-		dbType: TType;
+	Omit<
+		DefaultBaseColumnGenerics,
+		"selectType" | "updateType" | "insertType"
+	> & {
+		selectType: TType;
+		insertType: TType;
+		updateType: TType;
 	},
 	BinaryColumnGenerics
 >;

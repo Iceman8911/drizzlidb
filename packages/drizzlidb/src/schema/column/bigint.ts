@@ -13,14 +13,19 @@ import { _SharedColumnBuilderWithGenerated } from "./shared/generated";
 interface BigIntColumnGenerics
 	extends BaseColumnGenerics,
 		_SharedColumnBuilderWithGenerated.Generics {
-	type: bigint;
-	dbType: bigint;
+	insertType: bigint;
+	selectType: bigint;
+	updateType: bigint;
 }
 
 type DefaultBigIntColumnGenerics = Satisfies<
-	Omit<DefaultBaseColumnGenerics, "type" | "dbType"> & {
-		type: bigint;
-		dbType: bigint;
+	Omit<
+		DefaultBaseColumnGenerics,
+		"selectType" | "updateType" | "insertType"
+	> & {
+		selectType: bigint;
+		insertType: bigint;
+		updateType: bigint;
 		isGenerated: false;
 	},
 	BigIntColumnGenerics

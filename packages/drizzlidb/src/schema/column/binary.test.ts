@@ -5,12 +5,18 @@ describe(BinaryColumnBuilder.name, () => {
 	it("should set types", () => {
 		const blobBuilder = BinaryColumnBuilder().type("blob");
 		type BlobBuilderState = (typeof blobBuilder)["_state"];
-		expectTypeOf<BlobBuilderState["dbType"]>().toEqualTypeOf<Blob>;
-		expectTypeOf<BlobBuilderState["type"]>().toEqualTypeOf<Blob>;
+		expectTypeOf<
+			BlobBuilderState["selectType"] &
+				BlobBuilderState["insertType"] &
+				BlobBuilderState["updateType"]
+		>().toEqualTypeOf<Blob>;
 
 		const bufferBuilder = BinaryColumnBuilder<string, ArrayBuffer>();
 		type BufferBuilderState = (typeof bufferBuilder)["_state"];
-		expectTypeOf<BufferBuilderState["dbType"]>().toEqualTypeOf<ArrayBuffer>;
-		expectTypeOf<BufferBuilderState["type"]>().toEqualTypeOf<ArrayBuffer>;
+		expectTypeOf<
+			BufferBuilderState["insertType"] &
+				BufferBuilderState["selectType"] &
+				BufferBuilderState["updateType"]
+		>().toEqualTypeOf<ArrayBuffer>;
 	});
 });

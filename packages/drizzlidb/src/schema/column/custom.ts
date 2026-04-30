@@ -12,15 +12,24 @@ import {
 } from "./base";
 
 interface CustomColumnGenerics extends BaseColumnGenerics {
-	type: unknown;
+	/** What is stored in indexedDB */
+	dbType: IndexedDbCompatibleType;
+	insertType: unknown;
+	selectType: unknown;
+	updateType: unknown;
 }
 
 type DefaultCustomColumnGenerics<
 	TType = unknown,
 	TDbType extends IndexedDbCompatibleType = IndexedDbCompatibleType,
 > = Satisfies<
-	Omit<DefaultBaseColumnGenerics, "type" | "dbType"> & {
-		type: TType;
+	Omit<
+		DefaultBaseColumnGenerics,
+		"selectType" | "updateType" | "insertType"
+	> & {
+		selectType: TType;
+		updateType: TType;
+		insertType: TType;
 		dbType: TDbType;
 	},
 	CustomColumnGenerics
@@ -35,8 +44,8 @@ interface CustomColumnBuilderConfig<
 	TGenerics extends CustomColumnGenerics = DefaultCustomColumnGenerics,
 > extends BaseColumnBuilderConfig<TGenerics> {
 	codec: {
-		fromDb: (val: TGenerics["dbType"]) => Promisable<TGenerics["type"]>;
-		toDb: (val: TGenerics["type"]) => Promisable<TGenerics["dbType"]>;
+		fromDb: (val: TGenerics["dbType"]) => Promisable<TGenerics["selectType"]>;
+		toDb: (val: TGenerics["selectType"]) => Promisable<TGenerics["dbType"]>;
 	};
 }
 
@@ -52,7 +61,10 @@ type WithTransform<
 	TBuilder extends AnyCustomColumnBuilder,
 	TType,
 	TDbType extends IndexedDbCompatibleType,
-> = WithColumnBuilderState<TBuilder, { dbType: TDbType; type: TType }>;
+> = WithColumnBuilderState<
+	TBuilder,
+	{ dbType: TDbType; selectType: TType; updateType: TType; insertType: TType }
+>;
 
 /** For custom types without a specific builder here. Like custom classes. */
 class _CustomColumnBuilder<
@@ -82,14 +94,16 @@ class _CustomColumnBuilder<
 	 */
 	codec<
 		TSelf extends AnyCustomColumnBuilder,
-		TType = TSelf["_state"]["type"],
+		TType = TSelf["_state"]["selectType"],
 		TDbType extends IndexedDbCompatibleType = TSelf["_state"]["dbType"],
 	>(
 		this: TSelf,
 		fn: NonNullable<
 			CustomColumnBuilderConfig<
-				Omit<TSelf["_state"], "type" | "dbType"> & {
-					type: TType;
+				Omit<TSelf["_state"], "selectType" | "updateType" | "insertType"> & {
+					selectType: TType;
+					updateType: TType;
+					insertType: TType;
 					dbType: TDbType;
 				}
 			>["codec"]
@@ -102,8 +116,10 @@ class _CustomColumnBuilder<
 			TSelf,
 			TGenerics,
 			CustomColumnBuilderConfig<
-				Omit<TSelf["_state"], "type" | "dbType"> & {
-					type: TType;
+				Omit<TSelf["_state"], "selectType" | "updateType" | "insertType"> & {
+					selectType: TType;
+					updateType: TType;
+					insertType: TType;
 					dbType: TDbType;
 				}
 			>

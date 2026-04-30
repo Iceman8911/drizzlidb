@@ -5,6 +5,6 @@ describe(BooleanColumnBuilder.name, () => {
 	it("default should set default and preserve type", () => {
 		const b = BooleanColumnBuilder("flag").default(true);
 		expect(b._config.defaultVal).toBe(true);
-		expectTypeOf<(typeof b)["_state"]["type"]>().toEqualTypeOf<boolean>();
+		expectTypeOf<(typeof b)["_state"]["selectType"]>().toEqualTypeOf<boolean>();
 	});
 });

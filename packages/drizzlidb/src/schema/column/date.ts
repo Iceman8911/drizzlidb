@@ -12,14 +12,19 @@ import {
 } from "./base";
 
 interface DateColumnGenerics extends BaseColumnGenerics {
-	type: Date;
-	dbType: Date;
+	insertType: Date;
+	selectType: Date;
+	updateType: Date;
 }
 
 type DefaultDateColumnGenerics = Satisfies<
-	Omit<DefaultBaseColumnGenerics, "type" | "dbType"> & {
-		type: Date;
-		dbType: Date;
+	Omit<
+		DefaultBaseColumnGenerics,
+		"selectType" | "updateType" | "insertType"
+	> & {
+		selectType: Date;
+		insertType: Date;
+		updateType: Date;
 	},
 	DateColumnGenerics
 >;
