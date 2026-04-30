@@ -64,4 +64,18 @@ describe(ArrayColumnBuilder.name, () => {
 			expectTypeOf(arr2).not.toBeObject();
 		}).toThrow();
 	});
+
+	it("should not allow `.multiEntry()` to be called twice", () => {
+		const arr = ArrayColumnBuilder().multiEntry();
+
+		expectTypeOf<ReturnType<(typeof arr)["multiEntry"]>>().toBeString();
+		expect(() => arr.multiEntry()).toThrow();
+	});
+
+	it("should not allow `.unique()` to be called twice", () => {
+		const arr = ArrayColumnBuilder().unique("duplicate_idx");
+
+		expectTypeOf<ReturnType<(typeof arr)["unique"]>>().toBeString();
+		expect(() => arr.unique("duplicate_idx")).toThrow();
+	});
 });

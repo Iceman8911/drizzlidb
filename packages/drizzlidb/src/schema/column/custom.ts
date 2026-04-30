@@ -34,7 +34,7 @@ type AnyCustomColumnBuilder = _CustomColumnBuilder<
 interface CustomColumnBuilderConfig<
 	TGenerics extends CustomColumnGenerics = DefaultCustomColumnGenerics,
 > extends BaseColumnBuilderConfig<TGenerics> {
-	transformer: {
+	codec: {
 		fromDb: (val: TGenerics["dbType"]) => Promisable<TGenerics["type"]>;
 		toDb: (val: TGenerics["type"]) => Promisable<TGenerics["dbType"]>;
 	};
@@ -42,7 +42,7 @@ interface CustomColumnBuilderConfig<
 
 const DEFAULT_CUSTOM_COLUMN_BUILDER_CONFIG = {
 	...DEFAULT_COLUMN_BUILDER_CONFIG,
-	transformer: {
+	codec: {
 		fromDb: (val) => JSON.parse(JSON.stringify(val)),
 		toDb: JSON.stringify,
 	},
@@ -60,6 +60,10 @@ class _CustomColumnBuilder<
 	const TGenerics extends CustomColumnGenerics = DefaultCustomColumnGenerics,
 > extends BaseColumnBuilder<TName, TGenerics> {
 	override readonly _config: CustomColumnBuilderConfig<typeof this._state>;
+
+	readonly _customErr = {
+		codec: "🚨 A codec has already been set, and cannot be replaced.",
+	} as const;
 
 	constructor(
 		name?: TName,
@@ -88,9 +92,12 @@ class _CustomColumnBuilder<
 					type: TType;
 					dbType: TDbType;
 				}
-			>["transformer"]
+			>["codec"]
 		>,
 	): WithTransform<TSelf, TType, TDbType> {
+		if (this._config.codec !== DEFAULT_CUSTOM_COLUMN_BUILDER_CONFIG.codec)
+			throw Error(this._customErr.codec);
+
 		return this._factory<
 			TSelf,
 			TGenerics,
@@ -101,7 +108,7 @@ class _CustomColumnBuilder<
 				}
 			>
 		>({
-			transformer: fn,
+			codec: fn,
 		}) as never;
 	}
 }

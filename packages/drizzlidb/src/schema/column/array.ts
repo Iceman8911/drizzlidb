@@ -9,6 +9,7 @@ import {
 	type BaseColumnGenerics,
 	DEFAULT_COLUMN_BUILDER_CONFIG,
 	type DefaultBaseColumnGenerics,
+	DUPLICATED_CHAINER_ERROR_TEXT,
 	type WithColumnBuilderState,
 } from "./base";
 
@@ -75,16 +76,24 @@ const DEFAULT_ARRAY_COLUMN_BUILDER_CONFIG = {
 
 /** For simplicity, multi entry indexes cannot be unique, since while technically legal, the uniqueness is checked per array element, so having 2 rows with ["a"], and ["a", "b"] is invalid in IDB. */
 type CanHaveMultiEntryIndex<TGenerics extends BaseColumnGenerics> =
-	true extends TGenerics["isUniqueIndex"] ? false : true;
+	true extends TGenerics["isUniqueIndex"]
+		? false
+		: "isMultiEntryIndex" extends keyof TGenerics
+			? true extends TGenerics["isMultiEntryIndex"]
+				? false
+				: true
+			: true;
 
 /** For simplicity, unique indexes cannot be multi entry, since while technically legal, the uniqueness is checked per array element, so having 2 rows with ["a"], and ["a", "b"] is invalid in IDB. */
 type CanHaveUniqueIndex<
 	TGenerics extends BaseColumnGenerics | ArrayColumnGenerics,
-> = "isMultiEntryIndex" extends keyof TGenerics
-	? true extends TGenerics["isMultiEntryIndex"]
-		? false
-		: true
-	: true;
+> = true extends TGenerics["isUniqueIndex"]
+	? false
+	: "isMultiEntryIndex" extends keyof TGenerics
+		? true extends TGenerics["isMultiEntryIndex"]
+			? false
+			: true
+		: true;
 
 type IfCanHaveUnique<T extends AnyBaseColumnBuilder> =
 	true extends CanHaveUniqueIndex<T["_state"]> ? T : never;
@@ -120,7 +129,7 @@ class _ArrayColumnBuilder<
 
 	/** @internal */
 	readonly _arrErr = {
-		multiEntryOrUnique: `🚨 For simplicity, multi entry indexes cannot be unique and vice versa, since while technically legal, the uniqueness is checked per array element, so having 2 rows with [1], and [1, 2] is invalid in IDB.`,
+		multiEntryOrUnique: `🚨 For simplicity, multi entry indexes cannot be unique and vice versa, since while technically legal, the uniqueness is checked per array element, so having 2 rows with [1], and [1, 2] is invalid in IDB. ${DUPLICATED_CHAINER_ERROR_TEXT}`,
 	} as const;
 
 	constructor(
@@ -184,7 +193,9 @@ class _ArrayColumnBuilder<
 	): true extends CanHaveMultiEntryIndex<TSelf["_state"]>
 		? WithMultiEntryIndex<TSelf, TIdxName>
 		: TSelf["_arrErr"]["multiEntryOrUnique"] {
-		if (this._config.isUniqueIndex)
+		const { isUniqueIndex, isMultiEntryIndex } = this._config;
+
+		if (isUniqueIndex || isMultiEntryIndex)
 			throw Error(this._arrErr.multiEntryOrUnique);
 
 		return this._factory({
@@ -208,7 +219,9 @@ class _ArrayColumnBuilder<
 		name?: TIdxName,
 	): TSelf["_arrErr"]["multiEntryOrUnique"];
 	override unique(this: AnyArrayColumnBuilder, name?: string) {
-		if (this._config.isMultiEntryIndex)
+		const { isUniqueIndex, isMultiEntryIndex } = this._config;
+
+		if (isUniqueIndex || isMultiEntryIndex)
 			throw Error(this._arrErr.multiEntryOrUnique);
 
 		return super.unique(name) as never;

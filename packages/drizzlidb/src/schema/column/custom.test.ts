@@ -1,5 +1,5 @@
 // biome-ignore-all lint/complexity/noBannedTypes: <Just for a test example sake>
-import { describe, expectTypeOf, it } from "bun:test";
+import { describe, expect, expectTypeOf, it } from "bun:test";
 import { CustomColumnBuilder } from "./custom";
 
 type SerializedCustomClass = {
@@ -55,5 +55,19 @@ describe(CustomColumnBuilder.name, () => {
 		expectTypeOf<
 			FunctionBuilder["dbType"]
 		>().toEqualTypeOf<SerializedCustomClass>();
+	});
+
+	it("should throw when `.codec()` is called twice", () => {
+		const classBuilder = CustomColumnBuilder().codec({
+			fromDb: CustomClass.fromIdb,
+			toDb: (val) => val.toIdb(),
+		});
+
+		expect(() =>
+			classBuilder.codec({
+				fromDb: CustomClass.fromIdb,
+				toDb: (val) => val.toIdb(),
+			}),
+		).toThrow();
 	});
 });

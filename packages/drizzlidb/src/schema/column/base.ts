@@ -41,18 +41,14 @@ export type DefaultBaseColumnGenerics = Satisfies<
 	BaseColumnGenerics
 >;
 
-type CanHaveDefaultVal<TGenerics extends BaseColumnGenerics> =
-	true extends TGenerics["isComputed"] ? false : true;
-
-type CanHaveUpdateVal<TGenerics extends BaseColumnGenerics> =
+type CanBeComputed<TGenerics extends BaseColumnGenerics> =
 	true extends TGenerics["isComputed"]
 		? false
-		: true extends TGenerics["isReadonly"]
-			? false
-			: true;
-
-type CanHaveRegularIndex<TGenerics extends BaseColumnGenerics> =
-	true extends TGenerics["isIndex"] ? false : true;
+		: // : true extends TGenerics["hasDefaultVal"]
+			// 	? false
+			// 	: true extends TGenerics["hasUpdateVal"]
+			// 		? false
+			true;
 
 type CanBeNullable<TGenerics extends BaseColumnGenerics> =
 	true extends TGenerics["hasDefaultVal"]
@@ -65,7 +61,37 @@ type CanBeNullable<TGenerics extends BaseColumnGenerics> =
 					? false
 					: true extends TGenerics["isPrimaryKey"]
 						? false
-						: true;
+						: true extends TGenerics["isNullable"]
+							? false
+							: true;
+
+type CanBeReadonly<TGenerics extends BaseColumnGenerics> =
+	true extends TGenerics["isReadonly"] ? false : true;
+
+type CanHaveDefaultVal<TGenerics extends BaseColumnGenerics> =
+	true extends TGenerics["isComputed"]
+		? false
+		: true extends TGenerics["hasDefaultVal"]
+			? false
+			: true;
+
+type CanHaveUpdateVal<TGenerics extends BaseColumnGenerics> =
+	true extends TGenerics["isComputed"]
+		? false
+		: true extends TGenerics["isReadonly"]
+			? false
+			: true extends TGenerics["hasUpdateVal"]
+				? false
+				: true;
+
+type CanHavePrimaryIndex<TGenerics extends BaseColumnGenerics> =
+	true extends TGenerics["isPrimaryKey"] ? false : true;
+
+type CanHaveRegularIndex<TGenerics extends BaseColumnGenerics> =
+	true extends TGenerics["isIndex"] ? false : true;
+
+type CanHaveUniqueIndex<TGenerics extends BaseColumnGenerics> =
+	true extends TGenerics["isUniqueIndex"] ? false : true;
 
 // ----------------------------------
 // Column capability predicates
@@ -183,6 +209,8 @@ type WithUnique<
 	{ isUniqueIndex: true; indexName: TIdxName; isIndex: true }
 >;
 
+export const DUPLICATED_CHAINER_ERROR_TEXT = "🚨 Can't call it twice either.";
+
 // TODO: add a type-level error for custom column builders with data types not directly supported by structclone and wothout a propert transform
 /** Do not add private or protected properties to this or it's sub classes since it messes up with inference.
  *
@@ -215,12 +243,15 @@ export abstract class BaseColumnBuilder<
 	 * @internal
 	 */
 	readonly _err = {
-		default: "🚨 Cannot set a default value on a computed column.",
+		computed: `${DUPLICATED_CHAINER_ERROR_TEXT}`,
+		default: `🚨 Cannot set \`.default()\` value on a \`.computed()\` column. ${DUPLICATED_CHAINER_ERROR_TEXT}`,
 		index: (oldIdxName: (typeof this._state)["indexName"]) =>
-			`🚨 An index named '${oldIdxName}' already exists. Try removing any \`.primary()\` or \`.unique()\` ` as const,
-		nullable:
-			"🚨 Cannot enforce a nullable column when a computation, default value, updater, readonly constraint, primary constraint is present.",
-		updater: "🚨 Cannot add an updater to a readonly or computed column.",
+			`🚨 An index named '${oldIdxName}' already exists. Try removing any \`.primary()\` or \`.unique()\`. ${DUPLICATED_CHAINER_ERROR_TEXT}` as const,
+		nullable: `🚨 Cannot enforce \`.nullable()\` when \`.computed()\`, \`.default()\`, \`.update()\`, \`.readonly()\`, \`.primary()\` is present. ${DUPLICATED_CHAINER_ERROR_TEXT}`,
+		primary: `${DUPLICATED_CHAINER_ERROR_TEXT}`,
+		readonly: `${DUPLICATED_CHAINER_ERROR_TEXT}`,
+		unique: `${DUPLICATED_CHAINER_ERROR_TEXT}`,
+		updater: `🚨 Cannot add \`.update()\` when \`.readonly()\` or \`.computed()\`. ${DUPLICATED_CHAINER_ERROR_TEXT}`,
 	} as const;
 
 	/** If `.name` is specified, this is set to `.name` else a randomly generated string. */
@@ -291,7 +322,13 @@ export abstract class BaseColumnBuilder<
 		this: TSelf,
 		ref: () => TTable,
 		compute: (table: TTable) => Promisable<TSelf["_state"]["type"]>,
-	): WithComputed<TSelf> {
+	): true extends CanBeComputed<TSelf["_state"]>
+		? WithComputed<TSelf>
+		: TSelf["_err"]["computed"] {
+		const { computation } = this._config;
+
+		if (isNotUndefined(computation)) throw Error(this._err.computed);
+
 		return this._factory({
 			computation() {
 				return compute(ref());
@@ -319,7 +356,9 @@ export abstract class BaseColumnBuilder<
 	): true extends CanHaveDefaultVal<TSelf["_state"]>
 		? WithDefault<TSelf>
 		: typeof this._err.default {
-		if (isNotUndefined(this._config.computation))
+		const { computation, defaultVal } = this._config;
+
+		if (isNotUndefined(computation) || isNotUndefined(defaultVal))
 			throw Error(this._err.default);
 
 		return this._factory({
@@ -363,15 +402,22 @@ export abstract class BaseColumnBuilder<
 	): true extends CanBeNullable<TSelf["_state"]>
 		? WithNullable<TSelf>
 		: TSelf["_err"]["nullable"] {
-		const { computation, defaultVal, updater, isReadonly, isPrimaryKey } =
-			this._config;
+		const {
+			computation,
+			defaultVal,
+			updater,
+			isReadonly,
+			isPrimaryKey,
+			isNullable,
+		} = this._config;
 
 		if (
 			isNotUndefined(computation) ||
 			isNotUndefined(defaultVal) ||
 			isNotUndefined(updater) ||
 			isReadonly ||
-			isPrimaryKey
+			isPrimaryKey ||
+			isNullable
 		)
 			throw Error(this._err.nullable);
 
@@ -389,7 +435,14 @@ export abstract class BaseColumnBuilder<
 	primary<
 		TSelf extends AnyBaseColumnBuilder,
 		const TIdxName extends string = `${TName}_primary_idx`,
-	>(this: TSelf, name?: TIdxName): WithPrimary<TSelf, TIdxName> {
+	>(
+		this: TSelf,
+		name?: TIdxName,
+	): true extends CanHavePrimaryIndex<TSelf["_state"]>
+		? WithPrimary<TSelf, TIdxName>
+		: TSelf["_err"]["primary"] {
+		if (this._config.isPrimaryKey) throw Error(this._err.primary);
+
 		return this._factory({
 			indexName: name ?? `${this._randName}_primary_idx`,
 			isNullable: false,
@@ -406,7 +459,11 @@ export abstract class BaseColumnBuilder<
 	 */
 	readonly<TSelf extends AnyBaseColumnBuilder>(
 		this: TSelf,
-	): WithReadonly<TSelf> {
+	): true extends CanBeReadonly<TSelf["_state"]>
+		? WithReadonly<TSelf>
+		: TSelf["_err"]["readonly"] {
+		if (this._config.isReadonly) throw Error(this._err.readonly);
+
 		return this._factory({
 			isNullable: false,
 			isReadonly: true,
@@ -428,9 +485,9 @@ export abstract class BaseColumnBuilder<
 	): true extends CanHaveUpdateVal<TSelf["_state"]>
 		? WithUpdate<TSelf>
 		: TSelf["_err"]["updater"] {
-		const { isReadonly, computation } = this._config;
+		const { isReadonly, computation, updater } = this._config;
 
-		if (isReadonly || isNotUndefined(computation))
+		if (isReadonly || isNotUndefined(computation) || isNotUndefined(updater))
 			throw Error(this._err.updater);
 
 		return this._factory({ isNullable: false, updater: valOrFn }) as never;
@@ -447,7 +504,14 @@ export abstract class BaseColumnBuilder<
 	unique<
 		TSelf extends AnyBaseColumnBuilder,
 		const TIdxName extends string = `${TName}_unique_idx`,
-	>(this: TSelf, name?: TIdxName): WithUnique<TSelf, TIdxName> {
+	>(
+		this: TSelf,
+		name?: TIdxName,
+	): true extends CanHaveUniqueIndex<TSelf["_state"]>
+		? WithUnique<TSelf, TIdxName>
+		: TSelf["_err"]["unique"] {
+		if (this._config.isUniqueIndex) throw Error(this._err.unique);
+
 		return this._factory({
 			indexName: name ?? `${this._randName}_unique_idx`,
 			isUniqueIndex: true,

@@ -1,6 +1,6 @@
 /** biome-ignore-all lint/suspicious/noExplicitAny: <Generics stuff> */
 import type { Satisfies } from "../../shared/types";
-import { clone, getRandomUuid, isNotUndefined } from "../../shared/util";
+import { clone, getRandomUuid } from "../../shared/util";
 import {
 	BaseColumnBuilder,
 	type BaseColumnBuilderConfig,

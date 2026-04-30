@@ -1,12 +1,16 @@
 import { describe, expect, expectTypeOf, it } from "bun:test";
 import type { Satisfies } from "../../shared/types";
-import { BaseColumnBuilder, type BaseColumnGenerics } from "./base";
+import {
+	BaseColumnBuilder,
+	type BaseColumnGenerics,
+	type DefaultBaseColumnGenerics,
+} from "./base";
 
 describe(BaseColumnBuilder.name, () => {
 	/** Since `BaseColumnBuilder` is abstract, we extend it with a dummy wrapper. */
 	class TestColumnBuilder<
 		const TName extends string,
-		const TGenerics extends BaseColumnGenerics,
+		const TGenerics extends BaseColumnGenerics = DefaultBaseColumnGenerics,
 	> extends BaseColumnBuilder<TName, TGenerics> {}
 
 	type StringColumnGenerics = Satisfies<
@@ -150,5 +154,71 @@ describe(BaseColumnBuilder.name, () => {
 		expectTypeOf<
 			(typeof validatedBuilder)["_state"]["type"]
 		>().toEqualTypeOf<string>();
+	});
+
+	it("should not allow repeat chaining for repeated builder calls", () => {
+		const computedBuilder = new TestColumnBuilder().computed(
+			() => "",
+			(tbl) => tbl,
+		);
+
+		expectTypeOf<
+			ReturnType<(typeof computedBuilder)["computed"]>
+		>().toBeString();
+		expect(() =>
+			computedBuilder.computed(
+				() => "",
+				(tbl) => tbl,
+			),
+		).toThrow();
+
+		const defaultBuilder = new TestColumnBuilder<"col", StringColumnGenerics>(
+			"col",
+		).default("hello");
+
+		expectTypeOf<ReturnType<(typeof defaultBuilder)["default"]>>().toBeString();
+		expect(() => defaultBuilder.default("hello")).toThrow();
+
+		const nullableBuilder = new TestColumnBuilder<
+			"nullable",
+			StringColumnGenerics
+		>("nullable").nullable();
+
+		expectTypeOf<
+			ReturnType<(typeof nullableBuilder)["nullable"]>
+		>().toBeString();
+		expect(() => nullableBuilder.nullable()).toThrow();
+
+		const primaryBuilder = new TestColumnBuilder<"id", StringColumnGenerics>(
+			"id",
+		).primary("id_primary_idx");
+
+		expectTypeOf<ReturnType<(typeof primaryBuilder)["primary"]>>().toBeString();
+		expect(() => primaryBuilder.primary("id_primary_idx")).toThrow();
+
+		const readonlyBuilder = new TestColumnBuilder<
+			"readonly",
+			StringColumnGenerics
+		>("readonly").readonly();
+
+		expectTypeOf<
+			ReturnType<(typeof readonlyBuilder)["readonly"]>
+		>().toBeString();
+		expect(() => readonlyBuilder.readonly()).toThrow();
+
+		const updateBuilder = new TestColumnBuilder<
+			"updated",
+			StringColumnGenerics
+		>("updated").update(() => "next");
+
+		expectTypeOf<ReturnType<(typeof updateBuilder)["update"]>>().toBeString();
+		expect(() => updateBuilder.update(() => "next")).toThrow();
+
+		const uniqueBuilder = new TestColumnBuilder<"email", StringColumnGenerics>(
+			"email",
+		).unique("email_unique_idx");
+
+		expectTypeOf<ReturnType<(typeof uniqueBuilder)["unique"]>>().toBeString();
+		expect(() => uniqueBuilder.unique("email_unique_idx")).toThrow();
 	});
 });
