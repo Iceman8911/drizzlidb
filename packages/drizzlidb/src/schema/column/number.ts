@@ -9,8 +9,11 @@ import {
 	type DefaultBaseColumnGenerics,
 	type WithColumnBuilderState,
 } from "./base";
+import { _SharedColumnBuilderWithGenerated } from "./shared/generated";
 
-interface NumberColumnGenerics extends BaseColumnGenerics {
+interface NumberColumnGenerics
+	extends BaseColumnGenerics,
+		_SharedColumnBuilderWithGenerated.Generics {
 	type: number;
 	dbType: number;
 	isAutoIncrementing: boolean;
@@ -21,6 +24,7 @@ type DefaultNumberColumnGenerics = Satisfies<
 		isAutoIncrementing: false;
 		type: number;
 		dbType: number;
+		isGenerated: false;
 	},
 	NumberColumnGenerics
 >;
@@ -55,13 +59,20 @@ type WithNumberColumnBuilderState<
 type WithAutoIncrement<TBuilder extends AnyNumberColumnBuilder> =
 	WithNumberColumnBuilderState<TBuilder, { isAutoIncrementing: true }>;
 
+let generatedLastAt = 0,
+	generatedCounter = 0;
+
 class _NumberColumnBuilder<
-	const TName extends string = string,
-	const TGenerics extends NumberColumnGenerics = DefaultNumberColumnGenerics,
-> extends BaseColumnBuilder<TName, TGenerics> {
+		const TName extends string = string,
+		const TGenerics extends NumberColumnGenerics = DefaultNumberColumnGenerics,
+	>
+	extends BaseColumnBuilder<TName, TGenerics>
+	implements _SharedColumnBuilderWithGenerated.Builder
+{
 	/** @internal */
 	readonly _numErr = {
 		autoIncrement: "🚨 Only `.primary()` keys can be autoincremented once.",
+		generated: `${_SharedColumnBuilderWithGenerated.ERR_TEXT} \`.autoIncrement()\` counts too.`,
 	} as const;
 
 	override readonly _config: NumberColumnBuilderConfig<typeof this._state>;
@@ -95,6 +106,31 @@ class _NumberColumnBuilder<
 			Partial<NumberColumnGenerics>,
 			NumberColumnBuilderConfig
 		>({ isAutoIncrementing: true }) as never;
+	}
+
+	generated<TSelf extends AnyNumberColumnBuilder>(
+		this: TSelf,
+	): true extends _SharedColumnBuilderWithGenerated.CanGenerate<TSelf["_state"]>
+		? true extends TSelf["_state"]["isAutoIncrementing"]
+			? TSelf["_numErr"]["generated"]
+			: _SharedColumnBuilderWithGenerated.WithGenerated<TSelf>
+		: TSelf["_numErr"]["generated"] {
+		return _SharedColumnBuilderWithGenerated.setMethod(
+			this,
+			this._numErr.generated,
+			(): number => {
+				const now = Date.now();
+
+				if (now === generatedLastAt) {
+					generatedCounter++;
+				} else {
+					generatedLastAt = now;
+					generatedCounter = 0;
+				}
+
+				return now * 1024 + generatedCounter;
+			},
+		);
 	}
 }
 

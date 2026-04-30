@@ -31,6 +31,31 @@ describe(NumberColumnBuilder.name, () => {
 		>().toEqualTypeOf<true>();
 	});
 
+	it("should allow generated number columns and preserve generated state", () => {
+		const generatedBuilder = NumberColumnBuilder("id").generated();
+
+		expect(generatedBuilder.name).toBe("id");
+		expect(generatedBuilder._config.isReadonly).toBe(true);
+		expect(generatedBuilder._config.defaultVal).toBeFunction();
+		expectTypeOf<
+			(typeof generatedBuilder)["_state"]["isGenerated"]
+		>().toEqualTypeOf<true>();
+		expectTypeOf<
+			(typeof generatedBuilder)["_state"]["hasDefaultVal"]
+		>().toEqualTypeOf<true>();
+		expectTypeOf<
+			(typeof generatedBuilder)["_state"]["isReadonly"]
+		>().toEqualTypeOf<true>();
+	});
+
+	it("should type-level reject generated after a default value", () => {
+		const GeneratedAfterDefault = NumberColumnBuilder("id")
+			.default(1)
+			.generated();
+
+		expectTypeOf<typeof GeneratedAfterDefault>().not.toEqualTypeOf();
+	});
+
 	it("should reject autoIncrement for non-primary number columns", () => {
 		const builder = NumberColumnBuilder("score");
 

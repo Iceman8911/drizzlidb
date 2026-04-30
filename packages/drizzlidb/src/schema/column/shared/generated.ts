@@ -24,7 +24,12 @@ export namespace _SharedColumnBuilderWithGenerated {
 	export type WithGenerated<TBuilder extends AnyBaseColumnBuilder> =
 		WithColumnBuilderState<
 			TBuilder,
-			{ isGenerated: true; hasDefaultVal: true; isReadonly: true }
+			{
+				isGenerated: true;
+				hasDefaultVal: true;
+				isReadonly: true;
+				isNullable: false;
+			}
 		>;
 
 	export type CanGenerate<TGenerics extends Generics> =
@@ -57,6 +62,8 @@ export namespace _SharedColumnBuilderWithGenerated {
 
 		return builder._factory<AnyBaseColumnBuilder, Partial<Generics>>({
 			defaultVal: cb,
+			isNullable: false,
+			isReadonly: true,
 		}) as never;
 	};
 }
