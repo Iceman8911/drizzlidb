@@ -1,6 +1,7 @@
 // biome-ignore-all lint/complexity/noBannedTypes: <Just for a test example sake>
 import { describe, expect, expectTypeOf, it } from "bun:test";
 import { CustomColumnBuilder } from "./custom";
+import type { PrivateBaseColumnBuilderProps } from "./shared/private-symbols";
 
 type SerializedCustomClass = {
 	name: string;
@@ -32,12 +33,16 @@ describe(CustomColumnBuilder.name, () => {
 			string,
 			CustomClass,
 			SerializedCustomClass
-		>().codec({
-			fromDb: CustomClass.fromIdb,
-			toDb: (val) => val.toIdb(),
-		});
+		>()
+			.index()
+			.codec({
+				fromDb: CustomClass.fromIdb,
+				toDb: (val) => val.toIdb(),
+			});
 
-		type ClassBuilder = typeof classBuilder._state;
+		type ClassBuilder = PrivateBaseColumnBuilderProps.GetState<
+			typeof classBuilder
+		>;
 		expectTypeOf<ClassBuilder["selectType"]>().toEqualTypeOf<CustomClass>();
 		expectTypeOf<
 			ClassBuilder["dbType"]
@@ -50,7 +55,9 @@ describe(CustomColumnBuilder.name, () => {
 			toDb: (val) => val.toIdb(),
 		});
 
-		type ClassBuilder = typeof classBuilder._state;
+		type ClassBuilder = PrivateBaseColumnBuilderProps.GetState<
+			typeof classBuilder
+		>;
 		expectTypeOf<ClassBuilder["selectType"]>().toEqualTypeOf<CustomClass>();
 		expectTypeOf<
 			ClassBuilder["dbType"]

@@ -9,6 +9,7 @@ import {
 	type DefaultBaseColumnGenerics,
 } from "./base";
 import { _SharedColumnBuilderWithGenerated } from "./shared/generated";
+import { PrivateBaseColumnBuilderProps as PrivateProps } from "./shared/private-symbols";
 
 interface BigIntColumnGenerics
 	extends BaseColumnGenerics,
@@ -49,6 +50,8 @@ const DEFAULT_NUMBER_COLUMN_BUILDER_CONFIG = {
 // 	TUpdates extends Partial<BigIntColumnGenerics>,
 // > = WithColumnBuilderState<TBuilder, TUpdates>;
 
+const BigIntErr = Symbol(PrivateProps.getSymbolName("bigIntErr"));
+
 class _BigIntColumnBuilder<
 		const TName extends string = string,
 		const TGenerics extends BigIntColumnGenerics = DefaultBigIntColumnGenerics,
@@ -57,11 +60,13 @@ class _BigIntColumnBuilder<
 	implements _SharedColumnBuilderWithGenerated.Builder
 {
 	/** @internal */
-	readonly _bigIntErr = {
+	readonly [BigIntErr] = {
 		generated: _SharedColumnBuilderWithGenerated.ERR_TEXT,
 	} as const;
 
-	override readonly _config: BigIntColumnBuilderConfig<typeof this._state>;
+	override readonly [PrivateProps.Config]: BigIntColumnBuilderConfig<
+		PrivateProps.GetState<this>
+	>;
 
 	constructor(
 		name?: TName,
@@ -71,17 +76,19 @@ class _BigIntColumnBuilder<
 	) {
 		super(name, config);
 
-		this._config = config;
+		this[PrivateProps.Config] = config;
 	}
 
 	generated<TSelf extends AnyBigIntColumnBuilder>(
 		this: TSelf,
-	): true extends _SharedColumnBuilderWithGenerated.CanGenerate<TSelf["_state"]>
+	): true extends _SharedColumnBuilderWithGenerated.CanGenerate<
+		PrivateProps.GetState<TSelf>
+	>
 		? _SharedColumnBuilderWithGenerated.WithGenerated<TSelf>
-		: TSelf["_bigIntErr"]["generated"] {
+		: TSelf[typeof BigIntErr]["generated"] {
 		return _SharedColumnBuilderWithGenerated.setMethod(
 			this,
-			this._bigIntErr.generated,
+			this[BigIntErr].generated,
 			(): bigint => {
 				const time = BigInt(Date.now());
 

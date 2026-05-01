@@ -10,6 +10,7 @@ import {
 	type DefaultBaseColumnGenerics,
 	type WithColumnBuilderState,
 } from "./base";
+import { PrivateBaseColumnBuilderProps as PrivateProps } from "./shared/private-symbols";
 
 interface UnionToBinary {
 	arrayBuffer: ArrayBuffer;
@@ -65,7 +66,10 @@ class _BinaryColumnBuilder<
 	const TName extends string = string,
 	const TGenerics extends BinaryColumnGenerics = DefaultBinaryColumnGenerics,
 > extends BaseColumnBuilder<TName, TGenerics> {
-	override readonly _config: BinaryColumnBuilderConfig<typeof this._state>;
+	declare readonly [PrivateProps.State]: TGenerics;
+	override readonly [PrivateProps.Config]: BinaryColumnBuilderConfig<
+		PrivateProps.GetState<this>
+	>;
 
 	constructor(
 		name?: TName,
@@ -75,7 +79,7 @@ class _BinaryColumnBuilder<
 	) {
 		super(name, config);
 
-		this._config = config;
+		this[PrivateProps.Config] = config;
 	}
 
 	/** Specify the specific kind of binary data.

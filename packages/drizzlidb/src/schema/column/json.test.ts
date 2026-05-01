@@ -2,6 +2,7 @@ import { describe, expect, expectTypeOf, it } from "bun:test";
 import * as v from "valibot";
 import z from "zod";
 import { JsonColumnBuilder } from "./json";
+import { PrivateBaseColumnBuilderProps } from "./shared/private-symbols";
 
 describe(JsonColumnBuilder.name, () => {
 	it("should add a type-level schema upon initialization", () => {
@@ -13,13 +14,13 @@ describe(JsonColumnBuilder.name, () => {
 		const j = JsonColumnBuilder<"schema", TestType>();
 
 		expectTypeOf<
-			(typeof j)["_state"]["insertType"]
+			PrivateBaseColumnBuilderProps.GetState<typeof j>["insertType"]
 		>().toEqualTypeOf<TestType>();
 		expectTypeOf<
-			(typeof j)["_state"]["selectType"]
+			PrivateBaseColumnBuilderProps.GetState<typeof j>["selectType"]
 		>().toEqualTypeOf<TestType>();
 		expectTypeOf<
-			(typeof j)["_state"]["updateType"]
+			PrivateBaseColumnBuilderProps.GetState<typeof j>["updateType"]
 		>().toEqualTypeOf<TestType>();
 	});
 
@@ -39,15 +40,23 @@ describe(JsonColumnBuilder.name, () => {
 		type ValibotOutput = v.InferOutput<typeof ValibotSchema>;
 
 		const valibotSchemaBuilder = JsonColumnBuilder().schema(ValibotSchema);
-		expect(valibotSchemaBuilder._config.validator).toBeDefined();
+		expect(
+			valibotSchemaBuilder[PrivateBaseColumnBuilderProps.Config].validator,
+		).toBeDefined();
 		expectTypeOf<
-			(typeof valibotSchemaBuilder)["_state"]["insertType"]
+			PrivateBaseColumnBuilderProps.GetState<
+				typeof valibotSchemaBuilder
+			>["insertType"]
 		>().toEqualTypeOf<ValibotInput>();
 		expectTypeOf<
-			(typeof valibotSchemaBuilder)["_state"]["selectType"]
+			PrivateBaseColumnBuilderProps.GetState<
+				typeof valibotSchemaBuilder
+			>["selectType"]
 		>().toEqualTypeOf<ValibotOutput>();
 		expectTypeOf<
-			(typeof valibotSchemaBuilder)["_state"]["updateType"]
+			PrivateBaseColumnBuilderProps.GetState<
+				typeof valibotSchemaBuilder
+			>["updateType"]
 		>().toEqualTypeOf<ValibotInput>();
 
 		const ZodSchema = z.object({
@@ -65,15 +74,23 @@ describe(JsonColumnBuilder.name, () => {
 		type ZodOutput = z.output<typeof ZodSchema>;
 
 		const zodSchemaBuilder = JsonColumnBuilder().schema(ZodSchema);
-		expect(zodSchemaBuilder._config.validator).toBeDefined();
+		expect(
+			zodSchemaBuilder[PrivateBaseColumnBuilderProps.Config].validator,
+		).toBeDefined();
 		expectTypeOf<
-			(typeof zodSchemaBuilder)["_state"]["insertType"]
+			PrivateBaseColumnBuilderProps.GetState<
+				typeof zodSchemaBuilder
+			>["insertType"]
 		>().toEqualTypeOf<ZodInput>();
 		expectTypeOf<
-			(typeof zodSchemaBuilder)["_state"]["selectType"]
+			PrivateBaseColumnBuilderProps.GetState<
+				typeof zodSchemaBuilder
+			>["selectType"]
 		>().toEqualTypeOf<ZodOutput>();
 		expectTypeOf<
-			(typeof zodSchemaBuilder)["_state"]["updateType"]
+			PrivateBaseColumnBuilderProps.GetState<
+				typeof zodSchemaBuilder
+			>["updateType"]
 		>().toEqualTypeOf<ZodInput>();
 	});
 });

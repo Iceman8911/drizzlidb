@@ -10,6 +10,7 @@ import {
 	type DefaultBaseColumnGenerics,
 	type WithColumnBuilderState,
 } from "./base";
+import { PrivateBaseColumnBuilderProps } from "./shared/private-symbols";
 
 interface JsonColumnGenerics extends BaseColumnGenerics {
 	insertType: IndexedDbJsonType;
@@ -74,7 +75,10 @@ class _JsonColumnBuilder<
 	const TName extends string = string,
 	const TGenerics extends JsonColumnGenerics = DefaultJsonColumnGenerics,
 > extends BaseColumnBuilder<TName, TGenerics> {
-	override readonly _config: JsonColumnBuilderConfig<typeof this._state>;
+	declare readonly [PrivateBaseColumnBuilderProps.State]: TGenerics;
+	override readonly [PrivateBaseColumnBuilderProps.Config]: JsonColumnBuilderConfig<
+		PrivateBaseColumnBuilderProps.GetState<this>
+	>;
 
 	constructor(
 		name?: TName,
@@ -84,7 +88,7 @@ class _JsonColumnBuilder<
 	) {
 		super(name, config);
 
-		this._config = config;
+		this[PrivateBaseColumnBuilderProps.Config] = config;
 	}
 
 	/** Attach a standard schema to improve inference and validation (The schema's validation method is automatically called when needed).
@@ -98,7 +102,7 @@ class _JsonColumnBuilder<
 		this: TSelf,
 		schema: TStandardSchema,
 	): WithStandardSchema<TSelf, TStandardSchema> {
-		return this._factory({
+		return this[PrivateBaseColumnBuilderProps.Factory]({
 			validator: [
 				async (val) => {
 					const res = await schema["~standard"].validate(val);

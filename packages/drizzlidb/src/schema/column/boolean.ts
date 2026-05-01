@@ -8,6 +8,7 @@ import {
 	DEFAULT_COLUMN_BUILDER_CONFIG,
 	type DefaultBaseColumnGenerics,
 } from "./base";
+import { PrivateBaseColumnBuilderProps as PrivateProps } from "./shared/private-symbols";
 
 interface BooleanColumnGenerics extends BaseColumnGenerics {
 	insertType: boolean;
@@ -39,7 +40,10 @@ class _BooleanColumnBuilder<
 	const TName extends string = string,
 	const TGenerics extends BooleanColumnGenerics = DefaultBooleanColumnGenerics,
 > extends BaseColumnBuilder<TName, TGenerics> {
-	override readonly _config: BooleanColumnBuilderConfig<typeof this._state>;
+	declare readonly [PrivateProps.State]: TGenerics;
+	override readonly [PrivateProps.Config]: BooleanColumnBuilderConfig<
+		PrivateProps.GetState<this>
+	>;
 
 	constructor(
 		name?: TName,
@@ -49,7 +53,7 @@ class _BooleanColumnBuilder<
 	) {
 		super(name, config);
 
-		this._config = config;
+		this[PrivateProps.Config] = config;
 	}
 }
 

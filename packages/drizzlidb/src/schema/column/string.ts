@@ -10,6 +10,7 @@ import {
 	type WithColumnBuilderState,
 } from "./base";
 import { _SharedColumnBuilderWithGenerated } from "./shared/generated";
+import { PrivateBaseColumnBuilderProps as PrivateProps } from "./shared/private-symbols";
 
 interface StringColumnGenerics
 	extends BaseColumnGenerics,
@@ -57,6 +58,8 @@ type WithEnum<
 	}
 >;
 
+const StringError = Symbol(PrivateProps.getSymbolName("strErr"));
+
 class _StringColumnBuilder<
 		const TName extends string = string,
 		const TGenerics extends StringColumnGenerics = DefaultStringColumnGenerics,
@@ -65,12 +68,14 @@ class _StringColumnBuilder<
 	implements _SharedColumnBuilderWithGenerated.Builder
 {
 	/** @internal */
-	readonly _strErr = {
+	readonly [StringError] = {
 		enum: "🚨 Enum values must be a non-empty array of strings",
 		generated: _SharedColumnBuilderWithGenerated.ERR_TEXT,
 	} as const;
 
-	override readonly _config: StringColumnBuilderConfig<typeof this._state>;
+	override readonly [PrivateProps.Config]: StringColumnBuilderConfig<
+		PrivateProps.GetState<this>
+	>;
 
 	constructor(
 		name?: TName,
@@ -80,19 +85,21 @@ class _StringColumnBuilder<
 	) {
 		super(name, config);
 
-		this._config = config;
+		this[PrivateProps.Config] = config;
 	}
 
 	/** Narrow string type to a union of literal values. */
-	enum<
-		TSelf extends AnyStringColumnBuilder,
-		const TValues extends ReadonlyArray<string>,
-	>(this: TSelf, values: TValues): WithEnum<TSelf, TValues> {
-		if (!Array.isArray(values) || values.length === 0)
-			throw Error(this._strErr.enum);
+	enum<TSelf, const TValues extends ReadonlyArray<string>>(
+		this: TSelf,
+		values: TValues,
+	): WithEnum<TSelf extends AnyStringColumnBuilder ? TSelf : never, TValues> {
+		const self = this as AnyStringColumnBuilder;
 
-		return this._factory<
-			TSelf,
+		if (!Array.isArray(values) || values.length === 0)
+			throw Error(self[StringError].enum);
+
+		return self[PrivateProps.Factory]<
+			typeof self,
 			Partial<StringColumnGenerics>,
 			StringColumnBuilderConfig
 		>({
@@ -100,14 +107,20 @@ class _StringColumnBuilder<
 		}) as never;
 	}
 
-	generated<TSelf extends AnyStringColumnBuilder>(
+	generated<TSelf>(
 		this: TSelf,
-	): true extends _SharedColumnBuilderWithGenerated.CanGenerate<TSelf["_state"]>
-		? _SharedColumnBuilderWithGenerated.WithGenerated<TSelf>
-		: TSelf["_strErr"]["generated"] {
+	): TSelf extends AnyStringColumnBuilder
+		? true extends _SharedColumnBuilderWithGenerated.CanGenerate<
+				PrivateProps.GetState<TSelf>
+			>
+			? _SharedColumnBuilderWithGenerated.WithGenerated<TSelf>
+			: TSelf[typeof StringError]["generated"]
+		: never {
+		const self = this as AnyStringColumnBuilder;
+
 		return _SharedColumnBuilderWithGenerated.setMethod(
-			this,
-			this._strErr.generated,
+			self,
+			self[StringError].generated,
 			getRandomUuid,
 		);
 	}

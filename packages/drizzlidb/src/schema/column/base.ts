@@ -2,6 +2,7 @@
 import type { Merge, Promisable } from "type-fest";
 import type { Satisfies } from "../../shared/types";
 import { clone, getRandomUuid, isNotUndefined } from "../../shared/util";
+import { PrivateBaseColumnBuilderProps as PrivateProps } from "./shared/private-symbols";
 
 export interface BaseColumnGenerics {
 	hasDefaultVal: boolean;
@@ -133,7 +134,7 @@ export const DEFAULT_COLUMN_BUILDER_CONFIG =
 
 export type GetColumnBuilderState<TBuilder extends AnyBaseColumnBuilder> =
 	TBuilder extends {
-		readonly _state: infer RGenerics;
+		readonly [PrivateProps.State]: infer RGenerics;
 	}
 		? RGenerics
 		: never;
@@ -145,7 +146,7 @@ export type WithColumnBuilderState<
 > = Merge<
 	TBuilder,
 	{
-		readonly _state: {
+		readonly [PrivateProps.State]: {
 			[K in keyof GetColumnBuilderState<TBuilder>]: K extends keyof TUpdates
 				? NonNullable<TUpdates[K]>
 				: GetColumnBuilderState<TBuilder>[K];
@@ -188,7 +189,7 @@ type WithComputed<TBuilder extends AnyBaseColumnBuilder> =
 			hasUpdateVal: false;
 			insertType: never;
 			updateType: never;
-			selectType: NonNullable<TBuilder["_state"]["selectType"]>;
+			selectType: NonNullable<PrivateProps.GetState<TBuilder>["selectType"]>;
 		}
 	>;
 
@@ -198,8 +199,8 @@ export type WithDefault<TBuilder extends AnyBaseColumnBuilder> =
 		{
 			hasDefaultVal: true;
 			isNullable: false;
-			insertType: TBuilder["_state"]["insertType"] | undefined;
-			selectType: NonNullable<TBuilder["_state"]["selectType"]>;
+			insertType: PrivateProps.GetState<TBuilder>["insertType"] | undefined;
+			selectType: NonNullable<PrivateProps.GetState<TBuilder>["selectType"]>;
 		}
 	>;
 
@@ -213,8 +214,8 @@ type WithNullable<TBuilder extends AnyBaseColumnBuilder> =
 		TBuilder,
 		{
 			isNullable: true;
-			insertType: TBuilder["_state"]["insertType"] | undefined;
-			selectType: TBuilder["_state"]["selectType"] | null;
+			insertType: PrivateProps.GetState<TBuilder>["insertType"] | undefined;
+			selectType: PrivateProps.GetState<TBuilder>["selectType"] | null;
 		}
 	>;
 
@@ -229,7 +230,7 @@ type WithPrimary<
 		isPrimaryKey: true;
 		isNullable: false;
 		isIndex: true;
-		selectType: NonNullable<TBuilder["_state"]["selectType"]>;
+		selectType: NonNullable<PrivateProps.GetState<TBuilder>["selectType"]>;
 	}
 >;
 
@@ -240,7 +241,7 @@ type WithReadonly<TBuilder extends AnyBaseColumnBuilder> =
 			isReadonly: true;
 			isNullable: false;
 			hasUpdateVal: false;
-			selectType: NonNullable<TBuilder["_state"]["selectType"]>;
+			selectType: NonNullable<PrivateProps.GetState<TBuilder>["selectType"]>;
 			updateType: never;
 		}
 	>;
@@ -251,9 +252,9 @@ export type WithUpdate<TBuilder extends AnyBaseColumnBuilder> =
 		{
 			hasUpdateVal: true;
 			isNullable: false;
-			selectType: NonNullable<TBuilder["_state"]["selectType"]>;
+			selectType: NonNullable<PrivateProps.GetState<TBuilder>["selectType"]>;
 			// This commented line is unnecessary since all props in an update are optional by default
-			// updateType: TBuilder["_state"]["updateType"] | undefined
+			// updateType: TBuilder[typeof PrivateColumnBuilderProps.State]["updateType"] | undefined
 		}
 	>;
 
@@ -278,7 +279,7 @@ export abstract class BaseColumnBuilder<
 	const TGenerics extends BaseColumnGenerics = DefaultBaseColumnGenerics,
 > {
 	/** @internal */
-	readonly _ctor = this.constructor as {
+	readonly [PrivateProps.Ctor] = this.constructor as {
 		new <
 			const TName extends string,
 			const TGenerics extends BaseColumnGenerics = DefaultBaseColumnGenerics,
@@ -292,17 +293,19 @@ export abstract class BaseColumnBuilder<
 	 *
 	 * @internal
 	 */
-	readonly _config: BaseColumnBuilderConfig<typeof this._state>;
+	readonly [PrivateProps.Config]: BaseColumnBuilderConfig<
+		PrivateProps.GetState<typeof this>
+	>;
 
 	/** Error messages.
 	 *
 	 * @internal
 	 */
-	readonly _err = {
+	readonly [PrivateProps.Err] = {
 		computed: `${DUPLICATED_CHAINER_ERROR_TEXT}`,
 		default: `🚨 Cannot set \`.default()\` value on a \`.computed()\` column. ${DUPLICATED_CHAINER_ERROR_TEXT}`,
-		index: (oldIdxName: (typeof this._state)["indexName"]) =>
-			`🚨 An index named '${oldIdxName}' already exists. Try removing any \`.primary()\` or \`.unique()\`. ${DUPLICATED_CHAINER_ERROR_TEXT}` as const,
+		index:
+			`🚨 An index of some kind already exists. Try removing any \`.primary()\` or \`.unique()\`. ${DUPLICATED_CHAINER_ERROR_TEXT}` as const,
 		nullable: `🚨 Cannot enforce \`.nullable()\` when \`.computed()\`, \`.default()\`, \`.update()\`, \`.generated()\`, \`.readonly()\`, \`.primary()\` is present. ${DUPLICATED_CHAINER_ERROR_TEXT}`,
 		primary: `${DUPLICATED_CHAINER_ERROR_TEXT}`,
 		readonly: `${DUPLICATED_CHAINER_ERROR_TEXT}`,
@@ -314,43 +317,42 @@ export abstract class BaseColumnBuilder<
 	 *
 	 * @internal
 	 */
-	readonly _randName: string;
+	readonly [PrivateProps.RandName]: string;
 
 	/** Type-level only generic state. Use this over `TGenerics`.
 	 *
 	 * @internal
 	 */
-	declare readonly _state: TGenerics;
+	declare readonly [PrivateProps.State]: TGenerics;
 
 	/** If specified, this name will be pritoritzed as the column name when built. */
 	readonly name?: TName;
 
 	constructor(
 		name?: TName,
-		config: BaseColumnBuilderConfig<typeof this._state> = clone(
-			DEFAULT_COLUMN_BUILDER_CONFIG,
-		),
+		config: BaseColumnBuilderConfig<any> = clone(DEFAULT_COLUMN_BUILDER_CONFIG),
 	) {
 		this.name = name;
-		this._randName = name ?? getRandomUuid();
-		this._config = config;
+		this[PrivateProps.RandName] = name ?? getRandomUuid();
+		this[PrivateProps.Config] = config;
 	}
 
-	/**
+	/** Reusable helper for returning a new immutable class instance
+	 *
 	 * @internal
 	 */
-	_factory<
+	[PrivateProps.Factory]<
 		TSelf extends AnyBaseColumnBuilder,
 		TUpdates extends Partial<BaseColumnGenerics>,
 		TConfig extends Partial<BaseColumnBuilderConfig<any>> = Partial<
-			BaseColumnBuilderConfig<TSelf["_state"]>
+			BaseColumnBuilderConfig<PrivateProps.GetState<TSelf>>
 		>,
 	>(this: TSelf, updates: TConfig): WithColumnBuilderState<TSelf, TUpdates> {
-		return new this._ctor(this.name, {
-			...this._config,
+		return new this[PrivateProps.Ctor](this.name, {
+			...this[PrivateProps.Config],
 			...updates,
 			validator: [
-				...(this._config.validator ?? []),
+				...(this[PrivateProps.Config].validator ?? []),
 				...(updates.validator ?? []),
 			],
 		});
@@ -382,15 +384,16 @@ export abstract class BaseColumnBuilder<
 		ref: () => TTable,
 		compute: (
 			table: TTable,
-		) => Promisable<NonNullable<TSelf["_state"]["selectType"]>>,
-	): true extends CanBeComputed<TSelf["_state"]>
+		) => Promisable<NonNullable<PrivateProps.GetState<TSelf>["selectType"]>>,
+	): true extends CanBeComputed<PrivateProps.GetState<TSelf>>
 		? WithComputed<TSelf>
-		: TSelf["_err"]["computed"] {
-		const { computation } = this._config;
+		: PrivateProps.GetErr<TSelf>["computed"] {
+		const { computation } = this[PrivateProps.Config];
 
-		if (isNotUndefined(computation)) throw Error(this._err.computed);
+		if (isNotUndefined(computation))
+			throw Error(this[PrivateProps.Err].computed);
 
-		return this._factory({
+		return this[PrivateProps.Factory]({
 			computation() {
 				return compute(ref());
 			},
@@ -412,17 +415,17 @@ export abstract class BaseColumnBuilder<
 	default<TSelf extends AnyBaseColumnBuilder>(
 		this: TSelf,
 		valOrFn: NonNullable<
-			BaseColumnBuilderConfig<TSelf["_state"]>["defaultVal"]
+			BaseColumnBuilderConfig<PrivateProps.GetState<TSelf>>["defaultVal"]
 		>,
-	): true extends CanHaveDefaultVal<TSelf["_state"]>
+	): true extends CanHaveDefaultVal<PrivateProps.GetState<TSelf>>
 		? WithDefault<TSelf>
-		: typeof this._err.default {
-		const { computation, defaultVal } = this._config;
+		: PrivateProps.GetErr<TSelf>["default"] {
+		const { computation, defaultVal } = this[PrivateProps.Config];
 
 		if (isNotUndefined(computation) || isNotUndefined(defaultVal))
-			throw Error(this._err.default);
+			throw Error(this[PrivateProps.Err].default);
 
-		return this._factory({
+		return this[PrivateProps.Factory]({
 			defaultVal: valOrFn,
 			isNullable: false,
 		}) as never;
@@ -440,15 +443,15 @@ export abstract class BaseColumnBuilder<
 	>(
 		this: TSelf,
 		name?: TIdxName,
-	): true extends CanHaveRegularIndex<TSelf["_state"]>
+	): true extends CanHaveRegularIndex<PrivateProps.GetState<TSelf>>
 		? WithIndex<TSelf>
-		: ReturnType<TSelf["_err"]["index"]> {
-		const oldIdxName = this._config.indexName;
+		: PrivateProps.GetErr<TSelf>["index"] {
+		const oldIdxName = this[PrivateProps.Config].indexName;
 
-		if (isNotUndefined(oldIdxName)) throw Error(this._err.index(oldIdxName));
+		if (isNotUndefined(oldIdxName)) throw Error(this[PrivateProps.Err].index);
 
-		return this._factory({
-			indexName: name ?? `${this._randName}_idx`,
+		return this[PrivateProps.Factory]({
+			indexName: name ?? `${this[PrivateProps.RandName]}_idx`,
 		}) as never;
 	}
 
@@ -460,9 +463,9 @@ export abstract class BaseColumnBuilder<
 	 */
 	nullable<TSelf extends AnyBaseColumnBuilder>(
 		this: TSelf,
-	): true extends CanBeNullable<TSelf["_state"]>
+	): true extends CanBeNullable<PrivateProps.GetState<TSelf>>
 		? WithNullable<TSelf>
-		: TSelf["_err"]["nullable"] {
+		: PrivateProps.GetErr<TSelf>["nullable"] {
 		const {
 			computation,
 			defaultVal,
@@ -470,7 +473,7 @@ export abstract class BaseColumnBuilder<
 			isReadonly,
 			isPrimaryKey,
 			isNullable,
-		} = this._config;
+		} = this[PrivateProps.Config];
 
 		if (
 			isNotUndefined(computation) ||
@@ -480,9 +483,11 @@ export abstract class BaseColumnBuilder<
 			isPrimaryKey ||
 			isNullable
 		)
-			throw Error(this._err.nullable);
+			throw Error(this[PrivateProps.Err].nullable);
 
-		return this._factory({ isNullable: true }) as never;
+		return this[PrivateProps.Factory]({
+			isNullable: true,
+		}) as never;
 	}
 
 	/** Denotes that this column should be the primary key of a table.
@@ -499,13 +504,14 @@ export abstract class BaseColumnBuilder<
 	>(
 		this: TSelf,
 		name?: TIdxName,
-	): true extends CanHavePrimaryIndex<TSelf["_state"]>
+	): true extends CanHavePrimaryIndex<PrivateProps.GetState<TSelf>>
 		? WithPrimary<TSelf, TIdxName>
-		: TSelf["_err"]["primary"] {
-		if (this._config.isPrimaryKey) throw Error(this._err.primary);
+		: PrivateProps.GetErr<TSelf>["primary"] {
+		if (this[PrivateProps.Config].isPrimaryKey)
+			throw Error(this[PrivateProps.Err].primary);
 
-		return this._factory({
-			indexName: name ?? `${this._randName}_primary_idx`,
+		return this[PrivateProps.Factory]({
+			indexName: name ?? `${this[PrivateProps.RandName]}_primary_idx`,
 			isNullable: false,
 			isPrimaryKey: true,
 			isUniqueIndex: true,
@@ -520,12 +526,13 @@ export abstract class BaseColumnBuilder<
 	 */
 	readonly<TSelf extends AnyBaseColumnBuilder>(
 		this: TSelf,
-	): true extends CanBeReadonly<TSelf["_state"]>
+	): true extends CanBeReadonly<PrivateProps.GetState<TSelf>>
 		? WithReadonly<TSelf>
-		: TSelf["_err"]["readonly"] {
-		if (this._config.isReadonly) throw Error(this._err.readonly);
+		: PrivateProps.GetErr<TSelf>["readonly"] {
+		if (this[PrivateProps.Config].isReadonly)
+			throw Error(this[PrivateProps.Err].readonly);
 
-		return this._factory({
+		return this[PrivateProps.Factory]({
 			isNullable: false,
 			isReadonly: true,
 			updater: undefined,
@@ -542,16 +549,21 @@ export abstract class BaseColumnBuilder<
 	 */
 	update<TSelf extends AnyBaseColumnBuilder>(
 		this: TSelf,
-		valOrFn: NonNullable<BaseColumnBuilderConfig<TSelf["_state"]>["updater"]>,
-	): true extends CanHaveUpdateVal<TSelf["_state"]>
+		valOrFn: NonNullable<
+			BaseColumnBuilderConfig<PrivateProps.GetState<TSelf>>["updater"]
+		>,
+	): true extends CanHaveUpdateVal<PrivateProps.GetState<TSelf>>
 		? WithUpdate<TSelf>
-		: TSelf["_err"]["updater"] {
-		const { isReadonly, computation, updater } = this._config;
+		: PrivateProps.GetErr<TSelf>["updater"] {
+		const { isReadonly, computation, updater } = this[PrivateProps.Config];
 
 		if (isReadonly || isNotUndefined(computation) || isNotUndefined(updater))
-			throw Error(this._err.updater);
+			throw Error(this[PrivateProps.Err].updater);
 
-		return this._factory({ isNullable: false, updater: valOrFn }) as never;
+		return this[PrivateProps.Factory]({
+			isNullable: false,
+			updater: valOrFn,
+		}) as never;
 	}
 
 	/** Enforces that values in this column must be unique.
@@ -568,13 +580,14 @@ export abstract class BaseColumnBuilder<
 	>(
 		this: TSelf,
 		name?: TIdxName,
-	): true extends CanHaveUniqueIndex<TSelf["_state"]>
+	): true extends CanHaveUniqueIndex<PrivateProps.GetState<TSelf>>
 		? WithUnique<TSelf, TIdxName>
-		: TSelf["_err"]["unique"] {
-		if (this._config.isUniqueIndex) throw Error(this._err.unique);
+		: PrivateProps.GetErr<TSelf>["unique"] {
+		if (this[PrivateProps.Config].isUniqueIndex)
+			throw Error(this[PrivateProps.Err].unique);
 
-		return this._factory({
-			indexName: name ?? `${this._randName}_unique_idx`,
+		return this[PrivateProps.Factory]({
+			indexName: name ?? `${this[PrivateProps.RandName]}_unique_idx`,
 			isUniqueIndex: true,
 		}) as never;
 	}
@@ -586,10 +599,14 @@ export abstract class BaseColumnBuilder<
 	validate<TSelf extends AnyBaseColumnBuilder>(
 		this: TSelf,
 		...fns: Array<
-			(val: TSelf["_state"]["insertType"]) => Promisable<boolean | string>
+			(
+				val: PrivateProps.GetState<TSelf>["insertType"],
+			) => Promisable<boolean | string>
 		>
 	): TSelf {
-		return this._factory({ validator: fns }) as never;
+		return this[PrivateProps.Factory]({
+			validator: fns,
+		}) as never;
 	}
 }
 

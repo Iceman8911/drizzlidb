@@ -1,36 +1,44 @@
 import { describe, expect, expectTypeOf, it } from "bun:test";
+import { PrivateBaseColumnBuilderProps } from "./shared/private-symbols";
 import { StringColumnBuilder } from "./string";
 
 describe(StringColumnBuilder.name, () => {
 	it("should have `.enum()` should narrow type and add validator", () => {
-		const b = StringColumnBuilder().enum(["a", "b"]);
+		const strBuilder = StringColumnBuilder().primary().enum(["a", "b"]);
+		type strBuilder = PrivateBaseColumnBuilderProps.GetState<typeof strBuilder>;
 
-		expect(b._config.validator?.[0]).toBeFunction();
-		expectTypeOf<(typeof b)["_state"]["insertType"]>().toEqualTypeOf<
-			"a" | "b"
-		>();
-		expectTypeOf<(typeof b)["_state"]["selectType"]>().toEqualTypeOf<
-			"a" | "b"
-		>();
-		expectTypeOf<(typeof b)["_state"]["updateType"]>().toEqualTypeOf<
-			"a" | "b"
-		>();
+		expect(
+			strBuilder[PrivateBaseColumnBuilderProps.Config].validator?.[0],
+		).toBeFunction();
+		expectTypeOf<strBuilder["insertType"]>().toEqualTypeOf<"a" | "b">();
+		expectTypeOf<strBuilder["selectType"]>().toEqualTypeOf<"a" | "b">();
+		expectTypeOf<strBuilder["updateType"]>().toEqualTypeOf<"a" | "b">();
 	});
 
 	it("should allow generated string columns and preserve generated state", () => {
 		const generatedBuilder = StringColumnBuilder("id").generated();
 
 		expect(generatedBuilder.name).toBe("id");
-		expect(generatedBuilder._config.isReadonly).toBe(true);
-		expect(generatedBuilder._config.defaultVal).toBeFunction();
+		expect(
+			generatedBuilder[PrivateBaseColumnBuilderProps.Config].isReadonly,
+		).toBe(true);
+		expect(
+			generatedBuilder[PrivateBaseColumnBuilderProps.Config].defaultVal,
+		).toBeFunction();
 		expectTypeOf<
-			(typeof generatedBuilder)["_state"]["isGenerated"]
+			PrivateBaseColumnBuilderProps.GetState<
+				typeof generatedBuilder
+			>["isGenerated"]
 		>().toEqualTypeOf<true>();
 		expectTypeOf<
-			(typeof generatedBuilder)["_state"]["hasDefaultVal"]
+			PrivateBaseColumnBuilderProps.GetState<
+				typeof generatedBuilder
+			>["hasDefaultVal"]
 		>().toEqualTypeOf<true>();
 		expectTypeOf<
-			(typeof generatedBuilder)["_state"]["isReadonly"]
+			PrivateBaseColumnBuilderProps.GetState<
+				typeof generatedBuilder
+			>["isReadonly"]
 		>().toEqualTypeOf<true>();
 	});
 

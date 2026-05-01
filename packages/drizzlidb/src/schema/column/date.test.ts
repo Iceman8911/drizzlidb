@@ -1,16 +1,21 @@
 import { describe, expect, expectTypeOf, it } from "bun:test";
 import { DateColumnBuilder } from "./date";
+import { PrivateBaseColumnBuilderProps } from "./shared/private-symbols";
 
 describe(DateColumnBuilder.name, () => {
 	it("should support `.defaultNow()`", () => {
 		const d1 = DateColumnBuilder("created").defaultNow();
-		expect(d1._config.defaultVal).toBeFunction();
-		expectTypeOf<(typeof d1)["_state"]["selectType"]>().toEqualTypeOf<Date>();
+		expect(d1[PrivateBaseColumnBuilderProps.Config].defaultVal).toBeFunction();
+		expectTypeOf<
+			PrivateBaseColumnBuilderProps.GetState<typeof d1>["selectType"]
+		>().toEqualTypeOf<Date>();
 	});
 
 	it("should support `.updateNow()`", () => {
 		const d2 = DateColumnBuilder("updated").updateNow();
-		expect(d2._config.updater).toBeFunction();
-		expectTypeOf<(typeof d2)["_state"]["selectType"]>().toEqualTypeOf<Date>();
+		expect(d2[PrivateBaseColumnBuilderProps.Config].updater).toBeFunction();
+		expectTypeOf<
+			PrivateBaseColumnBuilderProps.GetState<typeof d2>["selectType"]
+		>().toEqualTypeOf<Date>();
 	});
 });

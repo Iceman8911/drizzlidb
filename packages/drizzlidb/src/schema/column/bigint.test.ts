@@ -1,14 +1,17 @@
 import { describe, expect, expectTypeOf, it } from "bun:test";
 import { BigIntColumnBuilder } from "./bigint";
+import { PrivateBaseColumnBuilderProps } from "./shared/private-symbols";
 
 describe(BigIntColumnBuilder.name, () => {
 	it("should preserve the builder name and default bigint config", () => {
 		const builder = BigIntColumnBuilder("count");
 
 		expect(builder.name).toBe("count");
-		expect(!!builder._config.defaultVal).toBe(false);
+		expect(!!builder[PrivateBaseColumnBuilderProps.Config].defaultVal).toBe(
+			false,
+		);
 
-		type builder = typeof builder._state;
+		type builder = PrivateBaseColumnBuilderProps.GetState<typeof builder>;
 
 		expectTypeOf<
 			builder["insertType"] & builder["selectType"] & builder["updateType"]
@@ -21,10 +24,16 @@ describe(BigIntColumnBuilder.name, () => {
 		const generatedBuilder = BigIntColumnBuilder("id").generated();
 
 		expect(generatedBuilder.name).toBe("id");
-		expect(generatedBuilder._config.isReadonly).toBe(true);
-		expect(generatedBuilder._config.defaultVal).toBeFunction();
+		expect(
+			generatedBuilder[PrivateBaseColumnBuilderProps.Config].isReadonly,
+		).toBe(true);
+		expect(
+			generatedBuilder[PrivateBaseColumnBuilderProps.Config].defaultVal,
+		).toBeFunction();
 
-		type generatedBuilder = typeof generatedBuilder._state;
+		type generatedBuilder = PrivateBaseColumnBuilderProps.GetState<
+			typeof generatedBuilder
+		>;
 
 		expectTypeOf<
 			generatedBuilder["insertType"] &

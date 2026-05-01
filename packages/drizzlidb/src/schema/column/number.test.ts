@@ -1,19 +1,30 @@
 import { describe, expect, expectTypeOf, it } from "bun:test";
 import { NumberColumnBuilder } from "./number";
+import { PrivateBaseColumnBuilderProps } from "./shared/private-symbols";
 
 describe(NumberColumnBuilder.name, () => {
 	it("should preserve the builder name and default number config", () => {
 		const namedBuilder = NumberColumnBuilder("count");
 
 		expect(namedBuilder.name).toBe("count");
-		expect(!!namedBuilder._config.isAutoIncrementing).toBe(false);
+		expect(
+			!!namedBuilder[PrivateBaseColumnBuilderProps.Config].isAutoIncrementing,
+		).toBe(false);
 		expectTypeOf<
-			(typeof namedBuilder)["_state"]["insertType"] &
-				(typeof namedBuilder)["_state"]["selectType"] &
-				(typeof namedBuilder)["_state"]["updateType"]
+			PrivateBaseColumnBuilderProps.GetState<
+				typeof namedBuilder
+			>["insertType"] &
+				PrivateBaseColumnBuilderProps.GetState<
+					typeof namedBuilder
+				>["selectType"] &
+				PrivateBaseColumnBuilderProps.GetState<
+					typeof namedBuilder
+				>["updateType"]
 		>().toEqualTypeOf<number>();
 		expectTypeOf<
-			(typeof namedBuilder)["_state"]["isAutoIncrementing"]
+			PrivateBaseColumnBuilderProps.GetState<
+				typeof namedBuilder
+			>["isAutoIncrementing"]
 		>().toEqualTypeOf<false>();
 	});
 
@@ -22,14 +33,25 @@ describe(NumberColumnBuilder.name, () => {
 			.primary("id_primary_idx")
 			.autoIncrement();
 
-		expect(autoIncrementBuilder._config.isPrimaryKey).toBe(true);
-		expect(autoIncrementBuilder._config.isAutoIncrementing).toBe(true);
-		expect(!!autoIncrementBuilder._config.isNullable).toBe(false);
+		expect(
+			autoIncrementBuilder[PrivateBaseColumnBuilderProps.Config].isPrimaryKey,
+		).toBe(true);
+		expect(
+			autoIncrementBuilder[PrivateBaseColumnBuilderProps.Config]
+				.isAutoIncrementing,
+		).toBe(true);
+		expect(
+			!!autoIncrementBuilder[PrivateBaseColumnBuilderProps.Config].isNullable,
+		).toBe(false);
 		expectTypeOf<
-			(typeof autoIncrementBuilder)["_state"]["isPrimaryKey"]
+			PrivateBaseColumnBuilderProps.GetState<
+				typeof autoIncrementBuilder
+			>["isPrimaryKey"]
 		>().toEqualTypeOf<true>();
 		expectTypeOf<
-			(typeof autoIncrementBuilder)["_state"]["isAutoIncrementing"]
+			PrivateBaseColumnBuilderProps.GetState<
+				typeof autoIncrementBuilder
+			>["isAutoIncrementing"]
 		>().toEqualTypeOf<true>();
 	});
 
@@ -37,16 +59,26 @@ describe(NumberColumnBuilder.name, () => {
 		const generatedBuilder = NumberColumnBuilder("id").generated();
 
 		expect(generatedBuilder.name).toBe("id");
-		expect(generatedBuilder._config.isReadonly).toBe(true);
-		expect(generatedBuilder._config.defaultVal).toBeFunction();
+		expect(
+			generatedBuilder[PrivateBaseColumnBuilderProps.Config].isReadonly,
+		).toBe(true);
+		expect(
+			generatedBuilder[PrivateBaseColumnBuilderProps.Config].defaultVal,
+		).toBeFunction();
 		expectTypeOf<
-			(typeof generatedBuilder)["_state"]["isGenerated"]
+			PrivateBaseColumnBuilderProps.GetState<
+				typeof generatedBuilder
+			>["isGenerated"]
 		>().toEqualTypeOf<true>();
 		expectTypeOf<
-			(typeof generatedBuilder)["_state"]["hasDefaultVal"]
+			PrivateBaseColumnBuilderProps.GetState<
+				typeof generatedBuilder
+			>["hasDefaultVal"]
 		>().toEqualTypeOf<true>();
 		expectTypeOf<
-			(typeof generatedBuilder)["_state"]["isReadonly"]
+			PrivateBaseColumnBuilderProps.GetState<
+				typeof generatedBuilder
+			>["isReadonly"]
 		>().toEqualTypeOf<true>();
 	});
 
@@ -69,7 +101,9 @@ describe(NumberColumnBuilder.name, () => {
 
 		const first = builder.autoIncrement();
 
-		expect(first._config.isAutoIncrementing).toBe(true);
+		expect(first[PrivateBaseColumnBuilderProps.Config].isAutoIncrementing).toBe(
+			true,
+		);
 		expect(() => first.autoIncrement()).toThrow();
 	});
 });

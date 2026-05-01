@@ -12,6 +12,7 @@ import {
 	DUPLICATED_CHAINER_ERROR_TEXT,
 	type WithColumnBuilderState,
 } from "./base";
+import { PrivateBaseColumnBuilderProps as PrivateProps } from "./shared/private-symbols";
 
 type PrimitiveCtor =
 	| StringConstructor
@@ -98,9 +99,9 @@ type CanHaveUniqueIndex<
 		: true;
 
 type IfCanHaveUnique<T extends AnyBaseColumnBuilder> =
-	true extends CanHaveUniqueIndex<T["_state"]> ? T : never;
+	true extends CanHaveUniqueIndex<PrivateProps.GetState<T>> ? T : never;
 type IfCannotHaveUnique<T extends AnyBaseColumnBuilder> =
-	true extends CanHaveUniqueIndex<T["_state"]> ? never : T;
+	true extends CanHaveUniqueIndex<PrivateProps.GetState<T>> ? never : T;
 
 type WithOf<
 	TBuilder extends AnyArrayColumnBuilder,
@@ -130,7 +131,9 @@ class _ArrayColumnBuilder<
 	const TName extends string = string,
 	const TGenerics extends ArrayColumnGenerics = DefaultArrayColumnGenerics,
 > extends BaseColumnBuilder<TName, TGenerics> {
-	override readonly _config: ArrayColumnBuilderConfig<typeof this._state>;
+	override readonly [PrivateProps.Config]: ArrayColumnBuilderConfig<
+		PrivateProps.GetState<this>
+	>;
 
 	/** @internal */
 	readonly _arrErr = {
@@ -145,7 +148,7 @@ class _ArrayColumnBuilder<
 	) {
 		super(name, config);
 
-		this._config = config;
+		this[PrivateProps.Config] = config;
 	}
 
 	/** Declare that the column stores an array of primitive values. If you need complex / deeply nested types, use the `jsonColumn()` builder.
@@ -195,16 +198,16 @@ class _ArrayColumnBuilder<
 	>(
 		this: TSelf,
 		name?: TIdxName,
-	): true extends CanHaveMultiEntryIndex<TSelf["_state"]>
+	): true extends CanHaveMultiEntryIndex<PrivateProps.GetState<TSelf>>
 		? WithMultiEntryIndex<TSelf, TIdxName>
 		: TSelf["_arrErr"]["multiEntryOrUnique"] {
-		const { isUniqueIndex, isMultiEntryIndex } = this._config;
+		const { isUniqueIndex, isMultiEntryIndex } = this[PrivateProps.Config];
 
 		if (isUniqueIndex || isMultiEntryIndex)
 			throw Error(this._arrErr.multiEntryOrUnique);
 
-		return this._factory({
-			indexName: name ?? `${this._randName}_multi_entry_idx`,
+		return this[PrivateProps.Factory]({
+			indexName: name ?? `${this[PrivateProps.RandName]}_multi_entry_idx`,
 			isMultiEntryIndex: true,
 		}) as never;
 	}
@@ -224,7 +227,7 @@ class _ArrayColumnBuilder<
 		name?: TIdxName,
 	): TSelf["_arrErr"]["multiEntryOrUnique"];
 	override unique(this: AnyArrayColumnBuilder, name?: string) {
-		const { isUniqueIndex, isMultiEntryIndex } = this._config;
+		const { isUniqueIndex, isMultiEntryIndex } = this[PrivateProps.Config];
 
 		if (isUniqueIndex || isMultiEntryIndex)
 			throw Error(this._arrErr.multiEntryOrUnique);

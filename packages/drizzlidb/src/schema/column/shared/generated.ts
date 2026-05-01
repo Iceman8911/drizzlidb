@@ -4,6 +4,7 @@ import type {
 	BaseColumnGenerics,
 	WithColumnBuilderState,
 } from "../base";
+import { PrivateBaseColumnBuilderProps } from "./private-symbols";
 
 export namespace _SharedColumnBuilderWithGenerated {
 	export interface Generics extends BaseColumnGenerics {
@@ -49,9 +50,10 @@ export namespace _SharedColumnBuilderWithGenerated {
 	export const setMethod = <TBuilder extends AnyBaseColumnBuilder>(
 		builder: TBuilder,
 		err: string,
-		cb: () => TBuilder["_state"]["selectType"],
+		cb: () => TBuilder[typeof PrivateBaseColumnBuilderProps.State]["selectType"],
 	) => {
-		const { defaultVal, updater, computation } = builder._config;
+		const { defaultVal, updater, computation } =
+			builder[PrivateBaseColumnBuilderProps.Config];
 
 		if (
 			isNotUndefined(defaultVal) ||
@@ -60,7 +62,10 @@ export namespace _SharedColumnBuilderWithGenerated {
 		)
 			throw Error(err);
 
-		return builder._factory<AnyBaseColumnBuilder, Partial<Generics>>({
+		return builder[PrivateBaseColumnBuilderProps.Factory]<
+			AnyBaseColumnBuilder,
+			Partial<Generics>
+		>({
 			defaultVal: cb,
 			isNullable: false,
 			isReadonly: true,
