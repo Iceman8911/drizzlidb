@@ -32,13 +32,8 @@ type DefaultBigIntColumnGenerics = Satisfies<
 	BigIntColumnGenerics
 >;
 
-type AnyBigIntColumnBuilder = _BigIntColumnBuilder<
-	string,
-	Record<keyof BigIntColumnGenerics, any>
->;
-
 interface BigIntColumnBuilderConfig<
-	TGenerics extends BigIntColumnGenerics = DefaultBigIntColumnGenerics,
+	TGenerics extends BigIntColumnGenerics = BigIntColumnGenerics,
 > extends BaseColumnBuilderConfig<TGenerics> {}
 
 const DEFAULT_NUMBER_COLUMN_BUILDER_CONFIG = {
@@ -46,7 +41,7 @@ const DEFAULT_NUMBER_COLUMN_BUILDER_CONFIG = {
 } as const satisfies BigIntColumnBuilderConfig;
 
 // type WithBigIntColumnBuilderState<
-// 	TBuilder extends AnyBigIntColumnBuilder,
+// 	TBuilder extends _BigIntColumnBuilder,
 // 	TUpdates extends Partial<BigIntColumnGenerics>,
 // > = WithColumnBuilderState<TBuilder, TUpdates>;
 
@@ -54,7 +49,7 @@ const BigIntErr = Symbol(PrivateProps.getSymbolName("bigIntErr"));
 
 class _BigIntColumnBuilder<
 		const TName extends string = string,
-		const TGenerics extends BigIntColumnGenerics = DefaultBigIntColumnGenerics,
+		const TGenerics extends BigIntColumnGenerics = BigIntColumnGenerics,
 	>
 	extends BaseColumnBuilder<TName, TGenerics>
 	implements _SharedColumnBuilderWithGenerated.Builder
@@ -79,7 +74,7 @@ class _BigIntColumnBuilder<
 		this[PrivateProps.Config] = config;
 	}
 
-	generated<TSelf extends AnyBigIntColumnBuilder>(
+	generated<TSelf extends _BigIntColumnBuilder>(
 		this: TSelf,
 	): true extends _SharedColumnBuilderWithGenerated.CanGenerate<
 		PrivateProps.GetState<TSelf>
@@ -104,4 +99,4 @@ class _BigIntColumnBuilder<
 }
 
 export const BigIntColumnBuilder = <const TName extends string>(name?: TName) =>
-	new _BigIntColumnBuilder(name);
+	new _BigIntColumnBuilder<TName, DefaultBigIntColumnGenerics>(name);

@@ -33,13 +33,8 @@ type DefaultStringColumnGenerics = Satisfies<
 	StringColumnGenerics
 >;
 
-type AnyStringColumnBuilder = _StringColumnBuilder<
-	string,
-	Record<keyof StringColumnGenerics, any>
->;
-
 interface StringColumnBuilderConfig<
-	TGenerics extends StringColumnGenerics = DefaultStringColumnGenerics,
+	TGenerics extends StringColumnGenerics = StringColumnGenerics,
 > extends BaseColumnBuilderConfig<TGenerics> {}
 
 const DEFAULT_STRING_COLUMN_BUILDER_CONFIG = {
@@ -47,7 +42,7 @@ const DEFAULT_STRING_COLUMN_BUILDER_CONFIG = {
 } as const satisfies StringColumnBuilderConfig;
 
 type WithEnum<
-	TBuilder extends AnyStringColumnBuilder,
+	TBuilder extends _StringColumnBuilder,
 	TValues extends readonly string[],
 > = WithColumnBuilderState<
 	TBuilder,
@@ -62,7 +57,7 @@ const StringError = Symbol(PrivateProps.getSymbolName("strErr"));
 
 class _StringColumnBuilder<
 		const TName extends string = string,
-		const TGenerics extends StringColumnGenerics = DefaultStringColumnGenerics,
+		const TGenerics extends StringColumnGenerics = StringColumnGenerics,
 	>
 	extends BaseColumnBuilder<TName, TGenerics>
 	implements _SharedColumnBuilderWithGenerated.Builder
@@ -89,17 +84,15 @@ class _StringColumnBuilder<
 	}
 
 	/** Narrow string type to a union of literal values. */
-	enum<TSelf, const TValues extends ReadonlyArray<string>>(
-		this: TSelf,
-		values: TValues,
-	): WithEnum<TSelf extends AnyStringColumnBuilder ? TSelf : never, TValues> {
-		const self = this as AnyStringColumnBuilder;
-
+	enum<
+		TSelf extends _StringColumnBuilder,
+		const TValues extends ReadonlyArray<string>,
+	>(this: TSelf, values: TValues): WithEnum<TSelf, TValues> {
 		if (!Array.isArray(values) || values.length === 0)
-			throw Error(self[StringError].enum);
+			throw Error(this[StringError].enum);
 
-		return self[PrivateProps.Factory]<
-			typeof self,
+		return this[PrivateProps.Factory]<
+			_StringColumnBuilder,
 			Partial<StringColumnGenerics>,
 			StringColumnBuilderConfig
 		>({
@@ -107,24 +100,20 @@ class _StringColumnBuilder<
 		}) as never;
 	}
 
-	generated<TSelf>(
+	generated<TSelf extends _StringColumnBuilder>(
 		this: TSelf,
-	): TSelf extends AnyStringColumnBuilder
-		? true extends _SharedColumnBuilderWithGenerated.CanGenerate<
-				PrivateProps.GetState<TSelf>
-			>
-			? _SharedColumnBuilderWithGenerated.WithGenerated<TSelf>
-			: TSelf[typeof StringError]["generated"]
-		: never {
-		const self = this as AnyStringColumnBuilder;
-
+	): true extends _SharedColumnBuilderWithGenerated.CanGenerate<
+		PrivateProps.GetState<TSelf>
+	>
+		? _SharedColumnBuilderWithGenerated.WithGenerated<TSelf>
+		: TSelf[typeof StringError]["generated"] {
 		return _SharedColumnBuilderWithGenerated.setMethod(
-			self,
-			self[StringError].generated,
+			this,
+			this[StringError].generated,
 			getRandomUuid,
 		);
 	}
 }
 
 export const StringColumnBuilder = <const TName extends string>(name?: TName) =>
-	new _StringColumnBuilder(name);
+	new _StringColumnBuilder<TName, DefaultStringColumnGenerics>(name);

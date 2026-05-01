@@ -2,7 +2,6 @@
 import type { IndexedDbBinaryType, Satisfies } from "../../shared/types";
 import { clone } from "../../shared/util";
 import {
-	type AnyBaseColumnBuilder,
 	BaseColumnBuilder,
 	type BaseColumnBuilderConfig,
 	type BaseColumnGenerics,
@@ -31,7 +30,7 @@ interface BinaryColumnGenerics extends BaseColumnGenerics {
 }
 
 type WithType<
-	TBuilder extends AnyBaseColumnBuilder,
+	TBuilder extends BaseColumnBuilder,
 	TType extends keyof UnionToBinary,
 > = WithColumnBuilderState<
 	TBuilder,
@@ -55,7 +54,7 @@ type DefaultBinaryColumnGenerics<TType extends Binary = Binary> = Satisfies<
 >;
 
 interface BinaryColumnBuilderConfig<
-	TGenerics extends BinaryColumnGenerics = DefaultBinaryColumnGenerics,
+	TGenerics extends BinaryColumnGenerics = BinaryColumnGenerics,
 > extends BaseColumnBuilderConfig<TGenerics> {}
 
 const DEFAULT_BINARY_COLUMN_BUILDER_CONFIG = {
@@ -64,7 +63,7 @@ const DEFAULT_BINARY_COLUMN_BUILDER_CONFIG = {
 
 class _BinaryColumnBuilder<
 	const TName extends string = string,
-	const TGenerics extends BinaryColumnGenerics = DefaultBinaryColumnGenerics,
+	const TGenerics extends BinaryColumnGenerics = BinaryColumnGenerics,
 > extends BaseColumnBuilder<TName, TGenerics> {
 	declare readonly [PrivateProps.State]: TGenerics;
 	override readonly [PrivateProps.Config]: BinaryColumnBuilderConfig<
@@ -86,7 +85,7 @@ class _BinaryColumnBuilder<
 	 *
 	 * @param _type no runtime use. purely for type inference.
 	 */
-	type<TType extends keyof UnionToBinary, TSelf extends AnyBaseColumnBuilder>(
+	type<TType extends keyof UnionToBinary, TSelf extends BaseColumnBuilder>(
 		this: TSelf,
 		_type: TType,
 	): WithType<TSelf, TType> {

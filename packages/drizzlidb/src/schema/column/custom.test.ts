@@ -34,7 +34,7 @@ describe(CustomColumnBuilder.name, () => {
 			CustomClass,
 			SerializedCustomClass
 		>()
-			.index()
+			.unique()
 			.codec({
 				fromDb: CustomClass.fromIdb,
 				toDb: (val) => val.toIdb(),

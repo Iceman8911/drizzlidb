@@ -15,14 +15,14 @@ import { PrivateBaseColumnBuilderProps as PrivateProps } from "./shared/private-
 interface CustomColumnGenerics extends BaseColumnGenerics {
 	/** What is stored in indexedDB */
 	dbType: IndexedDbCompatibleType;
-	insertType: unknown;
-	selectType: unknown;
-	updateType: unknown;
+	insertType: any;
+	selectType: any;
+	updateType: any;
 }
 
 type DefaultCustomColumnGenerics<
-	TType = unknown,
-	TDbType extends IndexedDbCompatibleType = IndexedDbCompatibleType,
+	TType,
+	TDbType extends IndexedDbCompatibleType,
 > = Satisfies<
 	Omit<
 		DefaultBaseColumnGenerics,
@@ -36,13 +36,8 @@ type DefaultCustomColumnGenerics<
 	CustomColumnGenerics
 >;
 
-type AnyCustomColumnBuilder = _CustomColumnBuilder<
-	string,
-	Record<keyof CustomColumnGenerics, any>
->;
-
 type CodecConfig<
-	TSelf extends AnyCustomColumnBuilder,
+	TSelf extends _CustomColumnBuilder,
 	TType,
 	TDbType extends IndexedDbCompatibleType,
 > = CustomColumnBuilderConfig<
@@ -58,11 +53,11 @@ type CodecConfig<
 >;
 
 interface CustomColumnBuilderConfig<
-	TGenerics extends CustomColumnGenerics = DefaultCustomColumnGenerics,
+	TGenerics extends CustomColumnGenerics = CustomColumnGenerics,
 > extends BaseColumnBuilderConfig<TGenerics> {
 	codec: {
-		fromDb: (val: TGenerics["dbType"]) => Promisable<TGenerics["selectType"]>;
-		toDb: (val: TGenerics["selectType"]) => Promisable<TGenerics["dbType"]>;
+		fromDb(val: TGenerics["dbType"]): Promisable<TGenerics["selectType"]>;
+		toDb(val: TGenerics["selectType"]): Promisable<TGenerics["dbType"]>;
 	};
 }
 
@@ -75,7 +70,7 @@ const DEFAULT_CUSTOM_COLUMN_BUILDER_CONFIG = {
 } as const satisfies CustomColumnBuilderConfig;
 
 type WithTransform<
-	TBuilder extends AnyCustomColumnBuilder,
+	TBuilder extends _CustomColumnBuilder,
 	TType,
 	TDbType extends IndexedDbCompatibleType,
 > = WithColumnBuilderState<
@@ -88,11 +83,9 @@ const CustomError = Symbol(PrivateProps.getSymbolName("customErr"));
 /** For custom types without a specific builder here. Like custom classes. */
 class _CustomColumnBuilder<
 	const TName extends string = string,
-	const TGenerics extends CustomColumnGenerics = DefaultCustomColumnGenerics,
+	const TGenerics extends CustomColumnGenerics = CustomColumnGenerics,
 > extends BaseColumnBuilder<TName, TGenerics> {
-	override readonly [PrivateProps.Config]: CustomColumnBuilderConfig<
-		PrivateProps.GetState<this>
-	>;
+	override readonly [PrivateProps.Config]: CustomColumnBuilderConfig<TGenerics>;
 
 	readonly [CustomError] = {
 		codec: "🚨 A codec has already been set, and cannot be replaced.",
@@ -114,40 +107,24 @@ class _CustomColumnBuilder<
 	 * Valuable for custom classes and anything else that cannot be natively represented in indexedDB.
 	 */
 	codec<
-		TSelf,
-		TType = TSelf extends AnyCustomColumnBuilder
-			? PrivateProps.GetState<TSelf>["selectType"]
-			: never,
+		TSelf extends _CustomColumnBuilder,
+		TType = PrivateProps.GetState<TSelf>["selectType"],
 		TDbType extends
-			IndexedDbCompatibleType = TSelf extends AnyCustomColumnBuilder
-			? PrivateProps.GetState<TSelf>["dbType"]
-			: never,
+			IndexedDbCompatibleType = PrivateProps.GetState<TSelf>["dbType"],
 	>(
 		this: TSelf,
-		fn: NonNullable<
-			CodecConfig<
-				TSelf extends AnyCustomColumnBuilder ? TSelf : never,
-				TType,
-				TDbType
-			>["codec"]
-		>,
-	): WithTransform<
-		TSelf extends AnyCustomColumnBuilder ? TSelf : never,
-		TType,
-		TDbType
-	> {
-		const self = this as AnyCustomColumnBuilder;
-
+		fn: CodecConfig<TSelf, TType, TDbType>["codec"],
+	): WithTransform<TSelf, TType, TDbType> {
 		if (
-			self[PrivateProps.Config].codec !==
+			this[PrivateProps.Config].codec !==
 			DEFAULT_CUSTOM_COLUMN_BUILDER_CONFIG.codec
 		)
-			throw Error(self[CustomError].codec);
+			throw Error(this[CustomError].codec);
 
-		return self[PrivateProps.Factory]<
-			typeof self,
+		return this[PrivateProps.Factory]<
+			_CustomColumnBuilder,
 			TGenerics,
-			CodecConfig<typeof self, TType, TDbType>
+			CodecConfig<_CustomColumnBuilder, TType, TDbType>
 		>({
 			codec: fn,
 		}) as never;

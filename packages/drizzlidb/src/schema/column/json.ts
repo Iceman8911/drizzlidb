@@ -32,13 +32,8 @@ type DefaultJsonColumnGenerics<
 	JsonColumnGenerics
 >;
 
-type AnyJsonColumnBuilder = _JsonColumnBuilder<
-	string,
-	Record<keyof JsonColumnGenerics, any>
->;
-
 interface JsonColumnBuilderConfig<
-	TGenerics extends JsonColumnGenerics = DefaultJsonColumnGenerics,
+	TGenerics extends JsonColumnGenerics = JsonColumnGenerics,
 > extends BaseColumnBuilderConfig<TGenerics> {
 	// TODO: add base JSON  schema type
 	schema?: unknown;
@@ -59,7 +54,7 @@ type InferStandardSchemaOutput<TSchema extends StandardSchemaV1> =
 		: "🚨 Output schema is not a compatible JSON object.";
 
 type WithStandardSchema<
-	TBuilder extends AnyJsonColumnBuilder,
+	TBuilder extends _JsonColumnBuilder,
 	TSchema extends StandardSchemaV1,
 > = WithColumnBuilderState<
 	TBuilder,
@@ -73,7 +68,7 @@ type WithStandardSchema<
 /** TODO: add standard schema support */
 class _JsonColumnBuilder<
 	const TName extends string = string,
-	const TGenerics extends JsonColumnGenerics = DefaultJsonColumnGenerics,
+	const TGenerics extends JsonColumnGenerics = JsonColumnGenerics,
 > extends BaseColumnBuilder<TName, TGenerics> {
 	declare readonly [PrivateBaseColumnBuilderProps.State]: TGenerics;
 	override readonly [PrivateBaseColumnBuilderProps.Config]: JsonColumnBuilderConfig<
@@ -97,12 +92,16 @@ class _JsonColumnBuilder<
 	 */
 	schema<
 		TStandardSchema extends StandardSchemaV1,
-		TSelf extends AnyJsonColumnBuilder,
+		TSelf extends _JsonColumnBuilder,
 	>(
 		this: TSelf,
 		schema: TStandardSchema,
 	): WithStandardSchema<TSelf, TStandardSchema> {
-		return this[PrivateBaseColumnBuilderProps.Factory]({
+		return this[PrivateBaseColumnBuilderProps.Factory]<
+			_JsonColumnBuilder,
+			Partial<JsonColumnGenerics>,
+			JsonColumnBuilderConfig
+		>({
 			validator: [
 				async (val) => {
 					const res = await schema["~standard"].validate(val);

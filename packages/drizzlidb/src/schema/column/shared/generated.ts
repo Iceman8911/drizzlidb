@@ -1,6 +1,6 @@
 import { isNotUndefined } from "../../../shared/util";
 import type {
-	AnyBaseColumnBuilder,
+	BaseColumnBuilder,
 	BaseColumnGenerics,
 	WithColumnBuilderState,
 } from "../base";
@@ -22,7 +22,7 @@ export namespace _SharedColumnBuilderWithGenerated {
 		generated(): unknown;
 	}
 
-	export type WithGenerated<TBuilder extends AnyBaseColumnBuilder> =
+	export type WithGenerated<TBuilder extends BaseColumnBuilder> =
 		WithColumnBuilderState<
 			TBuilder,
 			{
@@ -47,7 +47,7 @@ export namespace _SharedColumnBuilderWithGenerated {
 	export const ERR_TEXT =
 		"🚨 A column must not use `.default()`, `.update()`, `.computed()`, or `.generate()` beforehand.";
 
-	export const setMethod = <TBuilder extends AnyBaseColumnBuilder>(
+	export const setMethod = <TBuilder extends BaseColumnBuilder>(
 		builder: TBuilder,
 		err: string,
 		cb: () => TBuilder[typeof PrivateBaseColumnBuilderProps.State]["selectType"],
@@ -63,7 +63,7 @@ export namespace _SharedColumnBuilderWithGenerated {
 			throw Error(err);
 
 		return builder[PrivateBaseColumnBuilderProps.Factory]<
-			AnyBaseColumnBuilder,
+			TBuilder,
 			Partial<Generics>
 		>({
 			defaultVal: cb,

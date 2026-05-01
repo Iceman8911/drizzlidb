@@ -3,7 +3,6 @@
 import type { Satisfies } from "../../shared/types";
 import { clone } from "../../shared/util";
 import {
-	type AnyBaseColumnBuilder,
 	BaseColumnBuilder,
 	type BaseColumnBuilderConfig,
 	type BaseColumnGenerics,
@@ -43,13 +42,13 @@ type InferPrimitives<TPrimitives extends PrimitiveCtor[]> =
 		: [];
 
 interface ArrayColumnGenerics extends BaseColumnGenerics {
-	insertType: unknown[];
+	insertType: any[];
 	isMultiEntryIndex: boolean;
-	selectType: unknown[];
-	updateType: unknown[];
+	selectType: any[];
+	updateType: any[];
 }
 
-type DefaultArrayColumnGenerics<TType = unknown> = Satisfies<
+type DefaultArrayColumnGenerics<TType = any> = Satisfies<
 	Omit<
 		DefaultBaseColumnGenerics,
 		"selectType" | "updateType" | "insertType"
@@ -62,13 +61,8 @@ type DefaultArrayColumnGenerics<TType = unknown> = Satisfies<
 	ArrayColumnGenerics
 >;
 
-type AnyArrayColumnBuilder = _ArrayColumnBuilder<
-	string,
-	Record<keyof ArrayColumnGenerics, any>
->;
-
 interface ArrayColumnBuilderConfig<
-	TGenerics extends ArrayColumnGenerics = DefaultArrayColumnGenerics,
+	TGenerics extends ArrayColumnGenerics = ArrayColumnGenerics,
 > extends BaseColumnBuilderConfig<TGenerics> {
 	isMultiEntryIndex?: boolean;
 }
@@ -88,23 +82,17 @@ type CanHaveMultiEntryIndex<TGenerics extends BaseColumnGenerics> =
 			: true;
 
 /** For simplicity, unique indexes cannot be multi entry, since while technically legal, the uniqueness is checked per array element, so having 2 rows with ["a"], and ["a", "b"] is invalid in IDB. */
-type CanHaveUniqueIndex<
-	TGenerics extends BaseColumnGenerics | ArrayColumnGenerics,
-> = true extends TGenerics["isUniqueIndex"]
-	? false
-	: "isMultiEntryIndex" extends keyof TGenerics
-		? true extends TGenerics["isMultiEntryIndex"]
-			? false
-			: true
-		: true;
-
-type IfCanHaveUnique<T extends AnyBaseColumnBuilder> =
-	true extends CanHaveUniqueIndex<PrivateProps.GetState<T>> ? T : never;
-type IfCannotHaveUnique<T extends AnyBaseColumnBuilder> =
-	true extends CanHaveUniqueIndex<PrivateProps.GetState<T>> ? never : T;
+type CanHaveUniqueIndex<TGenerics extends BaseColumnGenerics> =
+	true extends TGenerics["isUniqueIndex"]
+		? false
+		: TGenerics extends ArrayColumnGenerics
+			? true extends TGenerics["isMultiEntryIndex"]
+				? false
+				: true
+			: true;
 
 type WithOf<
-	TBuilder extends AnyArrayColumnBuilder,
+	TBuilder extends _ArrayColumnBuilder,
 	TType extends InferPrimitive<PrimitiveCtor>,
 > = WithColumnBuilderState<
 	TBuilder,
@@ -112,7 +100,7 @@ type WithOf<
 >;
 
 type WithUniqueIndex<
-	TBuilder extends AnyBaseColumnBuilder,
+	TBuilder extends BaseColumnBuilder,
 	TIdxName extends string,
 > = WithColumnBuilderState<
 	TBuilder,
@@ -120,23 +108,26 @@ type WithUniqueIndex<
 >;
 
 type WithMultiEntryIndex<
-	TBuilder extends AnyArrayColumnBuilder,
+	TBuilder extends _ArrayColumnBuilder,
 	TIdxName extends string,
 > = WithColumnBuilderState<
 	TBuilder,
 	{ isMultiEntryIndex: true; indexName: TIdxName; isIndex: true }
 >;
 
+const ArrayError = Symbol(PrivateProps.getSymbolName("arrErr"));
+type ArrayError = typeof ArrayError;
+
 class _ArrayColumnBuilder<
 	const TName extends string = string,
-	const TGenerics extends ArrayColumnGenerics = DefaultArrayColumnGenerics,
+	const TGenerics extends ArrayColumnGenerics = ArrayColumnGenerics,
 > extends BaseColumnBuilder<TName, TGenerics> {
 	override readonly [PrivateProps.Config]: ArrayColumnBuilderConfig<
 		PrivateProps.GetState<this>
 	>;
 
 	/** @internal */
-	readonly _arrErr = {
+	readonly [ArrayError] = {
 		multiEntryOrUnique: `🚨 For simplicity, multi entry indexes cannot be unique and vice versa, since while technically legal, the uniqueness is checked per array element, so having 2 rows with [1], and [1, 2] is invalid in IDB. ${DUPLICATED_CHAINER_ERROR_TEXT}`,
 	} as const;
 
@@ -165,7 +156,7 @@ class _ArrayColumnBuilder<
 	 */
 	of<
 		TPrimitiveCtors extends PrimitiveCtor[],
-		TSelf extends AnyArrayColumnBuilder,
+		TSelf extends _ArrayColumnBuilder,
 	>(
 		this: TSelf,
 		..._ctors: TPrimitiveCtors
@@ -193,18 +184,18 @@ class _ArrayColumnBuilder<
 	 * - Affects how equality queries on this field behave.
 	 */
 	multiEntry<
-		TSelf extends AnyArrayColumnBuilder,
+		TSelf extends _ArrayColumnBuilder,
 		const TIdxName extends string = `${TName}_multi_entry_idx`,
 	>(
 		this: TSelf,
 		name?: TIdxName,
 	): true extends CanHaveMultiEntryIndex<PrivateProps.GetState<TSelf>>
 		? WithMultiEntryIndex<TSelf, TIdxName>
-		: TSelf["_arrErr"]["multiEntryOrUnique"] {
+		: TSelf[ArrayError]["multiEntryOrUnique"] {
 		const { isUniqueIndex, isMultiEntryIndex } = this[PrivateProps.Config];
 
 		if (isUniqueIndex || isMultiEntryIndex)
-			throw Error(this._arrErr.multiEntryOrUnique);
+			throw Error(this[ArrayError].multiEntryOrUnique);
 
 		return this[PrivateProps.Factory]({
 			indexName: name ?? `${this[PrivateProps.RandName]}_multi_entry_idx`,
@@ -213,24 +204,30 @@ class _ArrayColumnBuilder<
 	}
 
 	override unique<
-		TSelf extends AnyBaseColumnBuilder,
+		TSelf extends BaseColumnBuilder,
 		const TIdxName extends string = `${TName}_unique_idx`,
 	>(
-		this: IfCanHaveUnique<TSelf>,
+		this: TSelf,
 		name?: TIdxName,
-	): WithUniqueIndex<TSelf, TIdxName>;
+	): true extends CanHaveUniqueIndex<PrivateProps.GetState<TSelf>>
+		? WithUniqueIndex<TSelf, TIdxName>
+		: _ArrayColumnBuilder[ArrayError]["multiEntryOrUnique"];
+
 	override unique<
-		TSelf extends AnyArrayColumnBuilder,
+		TSelf extends _ArrayColumnBuilder,
 		const TIdxName extends string = `${TName}_unique_idx`,
 	>(
-		this: IfCannotHaveUnique<TSelf>,
+		this: TSelf,
 		name?: TIdxName,
-	): TSelf["_arrErr"]["multiEntryOrUnique"];
-	override unique(this: AnyArrayColumnBuilder, name?: string) {
+	): true extends CanHaveUniqueIndex<PrivateProps.GetState<TSelf>>
+		? WithUniqueIndex<TSelf, TIdxName>
+		: _ArrayColumnBuilder[ArrayError]["multiEntryOrUnique"];
+
+	override unique(this: _ArrayColumnBuilder, name?: string) {
 		const { isUniqueIndex, isMultiEntryIndex } = this[PrivateProps.Config];
 
 		if (isUniqueIndex || isMultiEntryIndex)
-			throw Error(this._arrErr.multiEntryOrUnique);
+			throw Error(this[ArrayError].multiEntryOrUnique);
 
 		return super.unique(name) as never;
 	}

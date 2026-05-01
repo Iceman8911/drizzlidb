@@ -35,13 +35,8 @@ type DefaultNumberColumnGenerics = Satisfies<
 	NumberColumnGenerics
 >;
 
-type AnyNumberColumnBuilder = _NumberColumnBuilder<
-	string,
-	Record<keyof NumberColumnGenerics, any>
->;
-
 interface NumberColumnBuilderConfig<
-	TGenerics extends NumberColumnGenerics = DefaultNumberColumnGenerics,
+	TGenerics extends NumberColumnGenerics = NumberColumnGenerics,
 > extends BaseColumnBuilderConfig<TGenerics> {
 	isAutoIncrementing?: boolean;
 }
@@ -58,11 +53,11 @@ type CanAutoIncrement<TGenerics extends NumberColumnGenerics> =
 		: false;
 
 type WithNumberColumnBuilderState<
-	TBuilder extends AnyNumberColumnBuilder,
+	TBuilder extends _NumberColumnBuilder,
 	TUpdates extends Partial<NumberColumnGenerics>,
 > = WithColumnBuilderState<TBuilder, TUpdates>;
 
-type WithAutoIncrement<TBuilder extends AnyNumberColumnBuilder> =
+type WithAutoIncrement<TBuilder extends _NumberColumnBuilder> =
 	WithNumberColumnBuilderState<TBuilder, { isAutoIncrementing: true }>;
 
 let generatedLastAt = 0,
@@ -72,7 +67,7 @@ const NumberError = Symbol(PrivateProps.getSymbolName("numErr"));
 
 class _NumberColumnBuilder<
 		const TName extends string = string,
-		const TGenerics extends NumberColumnGenerics = DefaultNumberColumnGenerics,
+		const TGenerics extends NumberColumnGenerics = NumberColumnGenerics,
 	>
 	extends BaseColumnBuilder<TName, TGenerics>
 	implements _SharedColumnBuilderWithGenerated.Builder
@@ -102,43 +97,35 @@ class _NumberColumnBuilder<
 	 *
 	 * This column will be optional in its `insert` type.
 	 */
-	autoIncrement<TSelf>(
+	autoIncrement<TSelf extends _NumberColumnBuilder>(
 		this: TSelf,
-	): TSelf extends AnyNumberColumnBuilder
-		? true extends CanAutoIncrement<PrivateProps.GetState<TSelf>>
-			? WithAutoIncrement<TSelf>
-			: TSelf[typeof NumberError]["autoIncrement"]
-		: never {
-		const self = this as _NumberColumnBuilder<TName, TGenerics>;
-
-		const { isPrimaryKey, isAutoIncrementing } = self[PrivateProps.Config];
+	): true extends CanAutoIncrement<PrivateProps.GetState<TSelf>>
+		? WithAutoIncrement<TSelf>
+		: TSelf[typeof NumberError]["autoIncrement"] {
+		const { isPrimaryKey, isAutoIncrementing } = this[PrivateProps.Config];
 
 		if (!isPrimaryKey || isAutoIncrementing)
-			throw Error(self[NumberError].autoIncrement);
+			throw Error(this[NumberError].autoIncrement);
 
-		return self[PrivateProps.Factory]<
-			typeof self,
+		return this[PrivateProps.Factory]<
+			_NumberColumnBuilder,
 			Partial<NumberColumnGenerics>,
 			NumberColumnBuilderConfig
 		>({ isAutoIncrementing: true }) as never;
 	}
 
-	generated<TSelf>(
+	generated<TSelf extends _NumberColumnBuilder>(
 		this: TSelf,
-	): TSelf extends AnyNumberColumnBuilder
-		? true extends _SharedColumnBuilderWithGenerated.CanGenerate<
-				PrivateProps.GetState<TSelf>
-			>
-			? true extends PrivateProps.GetState<TSelf>["isAutoIncrementing"]
-				? TSelf[typeof NumberError]["generated"]
-				: _SharedColumnBuilderWithGenerated.WithGenerated<TSelf>
-			: TSelf[typeof NumberError]["generated"]
-		: never {
-		const self = this as _NumberColumnBuilder<TName, TGenerics>;
-
+	): true extends _SharedColumnBuilderWithGenerated.CanGenerate<
+		PrivateProps.GetState<TSelf>
+	>
+		? true extends PrivateProps.GetState<TSelf>["isAutoIncrementing"]
+			? TSelf[typeof NumberError]["generated"]
+			: _SharedColumnBuilderWithGenerated.WithGenerated<TSelf>
+		: TSelf[typeof NumberError]["generated"] {
 		return _SharedColumnBuilderWithGenerated.setMethod(
-			self,
-			self[NumberError].generated,
+			this,
+			this[NumberError].generated,
 			(): number => {
 				const now = Date.now();
 
@@ -156,4 +143,4 @@ class _NumberColumnBuilder<
 }
 
 export const NumberColumnBuilder = <const TName extends string>(name?: TName) =>
-	new _NumberColumnBuilder(name);
+	new _NumberColumnBuilder<TName, DefaultNumberColumnGenerics>(name);

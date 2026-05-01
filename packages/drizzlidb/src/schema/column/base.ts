@@ -1,5 +1,5 @@
 /** biome-ignore-all lint/suspicious/noExplicitAny: <To accept any builder type> */
-import type { Merge, Promisable } from "type-fest";
+import type { Promisable, SimplifyDeep } from "type-fest";
 import type { Satisfies } from "../../shared/types";
 import { clone, getRandomUuid, isNotUndefined } from "../../shared/util";
 import { PrivateBaseColumnBuilderProps as PrivateProps } from "./shared/private-symbols";
@@ -9,7 +9,7 @@ export interface BaseColumnGenerics {
 	hasUpdateVal: boolean;
 	indexName: string;
 	/** Type when inserting data */
-	insertType: unknown;
+	insertType: any;
 	isComputed: boolean;
 	isIndex: boolean;
 	isNullable: boolean;
@@ -17,25 +17,20 @@ export interface BaseColumnGenerics {
 	isReadonly: boolean;
 	isUniqueIndex: boolean;
 	/** Type when reading data */
-	selectType: unknown;
+	selectType: any;
 	/** Type when updating data.
 	 *
 	 * Always a union with `undefined`.
 	 */
-	updateType: unknown;
+	updateType: any;
 }
-
-export type AnyBaseColumnBuilder = BaseColumnBuilder<
-	string,
-	Record<keyof BaseColumnGenerics, any>
->;
 
 export type DefaultBaseColumnGenerics = Satisfies<
 	{
 		isNullable: false;
-		selectType: unknown;
-		insertType: unknown;
-		updateType: unknown;
+		selectType: any;
+		insertType: any;
+		updateType: any;
 		hasDefaultVal: false;
 		hasUpdateVal: false;
 		isUniqueIndex: false;
@@ -107,45 +102,46 @@ type CanHaveUniqueIndex<TGenerics extends BaseColumnGenerics> =
 // ----------------------------------
 
 export type BaseColumnBuilderConfig<
-	TGenerics extends BaseColumnGenerics = DefaultBaseColumnGenerics,
-> = Readonly<{
-	/** If present, the column is mean to be an index */
-	indexName?: string;
+	TGenerics extends BaseColumnGenerics = BaseColumnGenerics,
+> = SimplifyDeep<
+	Readonly<{
+		/** If present, the column is mean to be an index */
+		indexName?: string;
 
-	defaultVal?:
-		| NonNullable<TGenerics["insertType"]>
-		| (() => Promisable<NonNullable<TGenerics["insertType"]>>);
-	updater?:
-		| NonNullable<TGenerics["insertType"]>
-		| (() => Promisable<NonNullable<TGenerics["insertType"]>>);
-	validator?: Array<
-		(val: NonNullable<TGenerics["insertType"]>) => Promisable<boolean | string>
-	>;
-	computation?: () => Promisable<NonNullable<TGenerics["selectType"]>>;
+		defaultVal?:
+			| NonNullable<TGenerics["insertType"]>
+			| (() => Promisable<NonNullable<TGenerics["insertType"]>>);
+		updater?:
+			| NonNullable<TGenerics["insertType"]>
+			| (() => Promisable<NonNullable<TGenerics["insertType"]>>);
+		validator?: Array<
+			(val: TGenerics["insertType"]) => Promisable<boolean | string>
+		>;
+		computation?: () => Promisable<NonNullable<TGenerics["selectType"]>>;
 
-	isNullable?: boolean;
-	isUniqueIndex?: boolean;
-	isPrimaryKey?: boolean;
-	isReadonly?: boolean;
-}>;
+		isNullable?: boolean;
+		isUniqueIndex?: boolean;
+		isPrimaryKey?: boolean;
+		isReadonly?: boolean;
+	}>
+>;
 
 export const DEFAULT_COLUMN_BUILDER_CONFIG =
 	{} as const satisfies BaseColumnBuilderConfig;
 
-export type GetColumnBuilderState<TBuilder extends AnyBaseColumnBuilder> =
+export type GetColumnBuilderState<TBuilder extends BaseColumnBuilder> =
 	TBuilder extends {
 		readonly [PrivateProps.State]: infer RGenerics;
 	}
 		? RGenerics
 		: never;
 
-/** Workaround for self-referencing generic? */
+/** Overwrite the builder's state with updates into a new type */
 export type WithColumnBuilderState<
-	TBuilder extends AnyBaseColumnBuilder,
+	TBuilder extends BaseColumnBuilder,
 	TUpdates extends Partial<BaseColumnGenerics>,
-> = Merge<
-	TBuilder,
-	{
+> = SimplifyDeep<
+	Omit<TBuilder, PrivateProps.State> & {
 		readonly [PrivateProps.State]: {
 			[K in keyof GetColumnBuilderState<TBuilder>]: K extends keyof TUpdates
 				? NonNullable<TUpdates[K]>
@@ -161,7 +157,7 @@ export type WithColumnBuilderState<
 // ----------------------------------
 
 type WithBrand<
-	TBuilder extends AnyBaseColumnBuilder,
+	TBuilder extends BaseColumnBuilder,
 	TBrand extends string,
 > = WithColumnBuilderState<
 	TBuilder,
@@ -178,22 +174,21 @@ type WithBrand<
 	}
 >;
 
-type WithComputed<TBuilder extends AnyBaseColumnBuilder> =
-	WithColumnBuilderState<
-		TBuilder,
-		{
-			isComputed: true;
-			isReadonly: true;
-			isNullable: false;
-			hasDefaultVal: false;
-			hasUpdateVal: false;
-			insertType: never;
-			updateType: never;
-			selectType: NonNullable<PrivateProps.GetState<TBuilder>["selectType"]>;
-		}
-	>;
+type WithComputed<TBuilder extends BaseColumnBuilder> = WithColumnBuilderState<
+	TBuilder,
+	{
+		isComputed: true;
+		isReadonly: true;
+		isNullable: false;
+		hasDefaultVal: false;
+		hasUpdateVal: false;
+		insertType: never;
+		updateType: never;
+		selectType: NonNullable<PrivateProps.GetState<TBuilder>["selectType"]>;
+	}
+>;
 
-export type WithDefault<TBuilder extends AnyBaseColumnBuilder> =
+export type WithDefault<TBuilder extends BaseColumnBuilder> =
 	WithColumnBuilderState<
 		TBuilder,
 		{
@@ -205,22 +200,21 @@ export type WithDefault<TBuilder extends AnyBaseColumnBuilder> =
 	>;
 
 type WithIndex<
-	TBuilder extends AnyBaseColumnBuilder,
+	TBuilder extends BaseColumnBuilder,
 	TIdxName extends string = string,
 > = WithColumnBuilderState<TBuilder, { indexName: TIdxName; isIndex: true }>;
 
-type WithNullable<TBuilder extends AnyBaseColumnBuilder> =
-	WithColumnBuilderState<
-		TBuilder,
-		{
-			isNullable: true;
-			insertType: PrivateProps.GetState<TBuilder>["insertType"] | undefined;
-			selectType: PrivateProps.GetState<TBuilder>["selectType"] | null;
-		}
-	>;
+type WithNullable<TBuilder extends BaseColumnBuilder> = WithColumnBuilderState<
+	TBuilder,
+	{
+		isNullable: true;
+		insertType: PrivateProps.GetState<TBuilder>["insertType"] | undefined;
+		selectType: PrivateProps.GetState<TBuilder>["selectType"] | null;
+	}
+>;
 
 type WithPrimary<
-	TBuilder extends AnyBaseColumnBuilder,
+	TBuilder extends BaseColumnBuilder,
 	TIdxName extends string = string,
 > = WithColumnBuilderState<
 	TBuilder,
@@ -234,19 +228,18 @@ type WithPrimary<
 	}
 >;
 
-type WithReadonly<TBuilder extends AnyBaseColumnBuilder> =
-	WithColumnBuilderState<
-		TBuilder,
-		{
-			isReadonly: true;
-			isNullable: false;
-			hasUpdateVal: false;
-			selectType: NonNullable<PrivateProps.GetState<TBuilder>["selectType"]>;
-			updateType: never;
-		}
-	>;
+type WithReadonly<TBuilder extends BaseColumnBuilder> = WithColumnBuilderState<
+	TBuilder,
+	{
+		isReadonly: true;
+		isNullable: false;
+		hasUpdateVal: false;
+		selectType: NonNullable<PrivateProps.GetState<TBuilder>["selectType"]>;
+		updateType: never;
+	}
+>;
 
-export type WithUpdate<TBuilder extends AnyBaseColumnBuilder> =
+export type WithUpdate<TBuilder extends BaseColumnBuilder> =
 	WithColumnBuilderState<
 		TBuilder,
 		{
@@ -259,7 +252,7 @@ export type WithUpdate<TBuilder extends AnyBaseColumnBuilder> =
 	>;
 
 type WithUnique<
-	TBuilder extends AnyBaseColumnBuilder,
+	TBuilder extends BaseColumnBuilder,
 	TIdxName extends string = string,
 > = WithColumnBuilderState<
 	TBuilder,
@@ -276,13 +269,13 @@ export const DUPLICATED_CHAINER_ERROR_TEXT = "🚨 Can't call it twice either.";
  */
 export abstract class BaseColumnBuilder<
 	const TName extends string = string,
-	const TGenerics extends BaseColumnGenerics = DefaultBaseColumnGenerics,
+	const TGenerics extends BaseColumnGenerics = BaseColumnGenerics,
 > {
 	/** @internal */
 	readonly [PrivateProps.Ctor] = this.constructor as {
 		new <
 			const TName extends string,
-			const TGenerics extends BaseColumnGenerics = DefaultBaseColumnGenerics,
+			const TGenerics extends BaseColumnGenerics,
 		>(
 			name?: TName,
 			config?: BaseColumnBuilderConfig<TGenerics>,
@@ -342,7 +335,7 @@ export abstract class BaseColumnBuilder<
 	 * @internal
 	 */
 	[PrivateProps.Factory]<
-		TSelf extends AnyBaseColumnBuilder,
+		TSelf extends BaseColumnBuilder,
 		TUpdates extends Partial<BaseColumnGenerics>,
 		TConfig extends Partial<BaseColumnBuilderConfig<any>> = Partial<
 			BaseColumnBuilderConfig<PrivateProps.GetState<TSelf>>
@@ -362,7 +355,7 @@ export abstract class BaseColumnBuilder<
 	 *
 	 * Runtime-only.
 	 */
-	brand<const TBrand extends string, TSelf extends AnyBaseColumnBuilder>(
+	brand<const TBrand extends string, TSelf extends BaseColumnBuilder>(
 		this: TSelf,
 		_brand: TBrand,
 	): WithBrand<TSelf, TBrand> {
@@ -379,7 +372,7 @@ export abstract class BaseColumnBuilder<
 	 *
 	 * @param ref reference to the table to compute from, e.g () => UserTable
 	 */
-	computed<TSelf extends AnyBaseColumnBuilder, TTable>(
+	computed<TSelf extends BaseColumnBuilder, TTable>(
 		this: TSelf,
 		ref: () => TTable,
 		compute: (
@@ -412,7 +405,7 @@ export abstract class BaseColumnBuilder<
 	 *
 	 * NOTE: Overrides `.nullable()`. Is overidden by `.computed()`.
 	 */
-	default<TSelf extends AnyBaseColumnBuilder>(
+	default<TSelf extends BaseColumnBuilder>(
 		this: TSelf,
 		valOrFn: NonNullable<
 			BaseColumnBuilderConfig<PrivateProps.GetState<TSelf>>["defaultVal"]
@@ -438,7 +431,7 @@ export abstract class BaseColumnBuilder<
 	 * @param name index name
 	 */
 	index<
-		TSelf extends AnyBaseColumnBuilder,
+		TSelf extends BaseColumnBuilder,
 		const TIdxName extends string = `${TName}_idx`,
 	>(
 		this: TSelf,
@@ -461,7 +454,7 @@ export abstract class BaseColumnBuilder<
 	 *
 	 * NOTE: Is overridden by `.default()`, `.update()`, `.computed()`, `.readonly()`, `.primary()`.
 	 */
-	nullable<TSelf extends AnyBaseColumnBuilder>(
+	nullable<TSelf extends BaseColumnBuilder>(
 		this: TSelf,
 	): true extends CanBeNullable<PrivateProps.GetState<TSelf>>
 		? WithNullable<TSelf>
@@ -499,7 +492,7 @@ export abstract class BaseColumnBuilder<
 	 * @param name primary key index name
 	 */
 	primary<
-		TSelf extends AnyBaseColumnBuilder,
+		TSelf extends BaseColumnBuilder,
 		const TIdxName extends string = `${TName}_primary_idx`,
 	>(
 		this: TSelf,
@@ -524,7 +517,7 @@ export abstract class BaseColumnBuilder<
 	 *
 	 * NOTE: Overrides `.nullable()`, `.update()`.
 	 */
-	readonly<TSelf extends AnyBaseColumnBuilder>(
+	readonly<TSelf extends BaseColumnBuilder>(
 		this: TSelf,
 	): true extends CanBeReadonly<PrivateProps.GetState<TSelf>>
 		? WithReadonly<TSelf>
@@ -547,7 +540,7 @@ export abstract class BaseColumnBuilder<
 	 *
 	 * NOTE: Overrides `.nullable()`. Is overridden by `.computed()`, `.readonly()`.
 	 */
-	update<TSelf extends AnyBaseColumnBuilder>(
+	update<TSelf extends BaseColumnBuilder>(
 		this: TSelf,
 		valOrFn: NonNullable<
 			BaseColumnBuilderConfig<PrivateProps.GetState<TSelf>>["updater"]
@@ -575,7 +568,7 @@ export abstract class BaseColumnBuilder<
 	 * @param name unique index name
 	 */
 	unique<
-		TSelf extends AnyBaseColumnBuilder,
+		TSelf extends BaseColumnBuilder,
 		const TIdxName extends string = `${TName}_unique_idx`,
 	>(
 		this: TSelf,
@@ -596,7 +589,7 @@ export abstract class BaseColumnBuilder<
 	 *
 	 * @param fns validator functions. Returns true if successful, false if unsuccessful, or a string for a custom error message
 	 */
-	validate<TSelf extends AnyBaseColumnBuilder>(
+	validate<TSelf extends BaseColumnBuilder>(
 		this: TSelf,
 		...fns: Array<
 			(

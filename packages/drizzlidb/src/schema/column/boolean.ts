@@ -29,7 +29,7 @@ type DefaultBooleanColumnGenerics = Satisfies<
 >;
 
 interface BooleanColumnBuilderConfig<
-	TGenerics extends BooleanColumnGenerics = DefaultBooleanColumnGenerics,
+	TGenerics extends BooleanColumnGenerics = BooleanColumnGenerics,
 > extends BaseColumnBuilderConfig<TGenerics> {}
 
 const DEFAULT_BOOLEAN_COLUMN_BUILDER_CONFIG = {
@@ -38,7 +38,7 @@ const DEFAULT_BOOLEAN_COLUMN_BUILDER_CONFIG = {
 
 class _BooleanColumnBuilder<
 	const TName extends string = string,
-	const TGenerics extends BooleanColumnGenerics = DefaultBooleanColumnGenerics,
+	const TGenerics extends BooleanColumnGenerics = BooleanColumnGenerics,
 > extends BaseColumnBuilder<TName, TGenerics> {
 	declare readonly [PrivateProps.State]: TGenerics;
 	override readonly [PrivateProps.Config]: BooleanColumnBuilderConfig<
@@ -59,4 +59,4 @@ class _BooleanColumnBuilder<
 
 export const BooleanColumnBuilder = <const TName extends string>(
 	name?: TName,
-) => new _BooleanColumnBuilder(name);
+) => new _BooleanColumnBuilder<TName, DefaultBooleanColumnGenerics>(name);
