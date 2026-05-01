@@ -83,11 +83,13 @@ describe(NumberColumnBuilder.name, () => {
 	});
 
 	it("should type-level reject generated after a default value", () => {
-		const GeneratedAfterDefault = NumberColumnBuilder("id")
-			.default(1)
-			.generated();
+		expect(() => {
+			const GeneratedAfterDefault = NumberColumnBuilder("id")
+				.default(1)
+				.generated();
 
-		expectTypeOf<typeof GeneratedAfterDefault>().not.toEqualTypeOf();
+			expectTypeOf<typeof GeneratedAfterDefault>().not.toEqualTypeOf();
+		}).toThrow();
 	});
 
 	it("should reject autoIncrement for non-primary number columns", () => {

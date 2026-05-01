@@ -43,10 +43,12 @@ describe(StringColumnBuilder.name, () => {
 	});
 
 	it("should type-level reject generated after a default value", () => {
-		const GeneratedAfterDefault = StringColumnBuilder("id")
-			.default("x")
-			.generated();
+		expect(() => {
+			const GeneratedAfterDefault = StringColumnBuilder("id")
+				.default("x")
+				.generated();
 
-		expectTypeOf<typeof GeneratedAfterDefault>().not.toBeObject();
+			expectTypeOf<typeof GeneratedAfterDefault>().not.toBeObject();
+		}).toThrow();
 	});
 });
